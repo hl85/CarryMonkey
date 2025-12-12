@@ -21,127 +21,183 @@ function injectScript(tabId: number, script: UserScript) {
         
         // 多重 nonce 检测策略
         function detectNonce() {
-          const methods = [
-            // 方法1: 从现有脚本标签中提取 nonce
-            () => {
-              const scripts = document.querySelectorAll('script[nonce]');
-              if (scripts.length > 0) {
-                const nonce = scripts[0].getAttribute('nonce');
-                if (nonce) {
-                  logs.push(`Nonce found from script tag: ${nonce}`);
-                  return nonce;
+          logs.push('Starting nonce detection...');
+          
+          // 方法1: 从现有脚本标签中提取 nonce
+          logs.push('Method 1: Checking script tags...');
+          const scripts = document.querySelectorAll('script[nonce]');
+          logs.push(`Found ${scripts.length} script tags with nonce attribute`);
+          if (scripts.length > 0) {
+            const nonce = scripts[0].getAttribute('nonce');
+            logs.push(`First script nonce value: "${nonce}"`);
+            if (nonce) {
+              logs.push(`Nonce found from script tag: ${nonce}`);
+              return nonce;
+            } else {
+              logs.push('First script nonce attribute is empty or null');
+              // 尝试检查其他脚本标签
+              for (let i = 0; i < Math.min(scripts.length, 5); i++) {
+                const scriptNonce = scripts[i].getAttribute('nonce');
+                logs.push(`Script ${i} nonce: "${scriptNonce}"`);
+                if (scriptNonce) {
+                  logs.push(`Nonce found from script tag ${i}: ${scriptNonce}`);
+                  return scriptNonce;
                 }
               }
-              return null;
-            },
-            // 方法2: 从 meta 标签中提取 nonce
-            () => {
-              const metaNonce = document.querySelector('meta[property="csp-nonce"]');
-              if (metaNonce) {
-                const nonce = metaNonce.getAttribute('content');
-                if (nonce) {
-                  logs.push(`Nonce found from meta tag: ${nonce}`);
-                  return nonce;
-                }
-              }
-              return null;
-            },
-            // 方法3: 从 CSP 头部解析 nonce
-            () => {
-              const cspMeta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
-              if (cspMeta) {
-                const csp = cspMeta.getAttribute('content');
-                if (csp) {
-                  const nonceMatch = csp.match(/nonce-([a-zA-Z0-9+/=]+)/);
-                  if (nonceMatch) {
-                    const nonce = nonceMatch[1];
-                    logs.push(`Nonce found from CSP meta: ${nonce}`);
-                    return nonce;
-                  }
-                }
-              }
-              return null;
-            },
-            // 方法3.5: 从当前页面的 CSP 错误信息中提取 nonce（特别针对微信公众号）
-            () => {
-              try {
-                // 创建一个临时脚本来触发 CSP 违规，从而获取 nonce 信息
-                const tempScript = document.createElement('script');
-                tempScript.textContent = '// temp';
-                
-                let detectedNonce: string | null = null;
-                const tempHandler = (e: SecurityPolicyViolationEvent) => {
-                  const nonceMatch = e.originalPolicy.match(/'nonce-([a-zA-Z0-9+/=]+)'/);
-                  if (nonceMatch) {
-                    detectedNonce = nonceMatch[1];
-                    logs.push(`Nonce found from CSP violation event: ${detectedNonce}`);
-                  }
-                };
-                
-                document.addEventListener('securitypolicyviolation', tempHandler);
-                
-                try {
-                  document.head.appendChild(tempScript);
-                  document.head.removeChild(tempScript);
-                } catch (e) {
-                  // CSP 违规是预期的
-                }
-                
-                document.removeEventListener('securitypolicyviolation', tempHandler);
-                return detectedNonce;
-              } catch (e) {
-                return null;
-              }
-            },
-            // 方法4: 从页面中查找 CSP 违规报告中的 nonce
-            () => {
-              // 尝试从错误消息中提取 nonce
-              const errorMessages: string[] = [];
-              const originalConsoleError = console.error;
-              console.error = function(...args: any[]) {
-                errorMessages.push(args.join(' '));
-                return originalConsoleError.apply(console, args);
-              };
-              
-              // 检查是否有 CSP 违规信息包含 nonce
-              const cspViolationPattern = /nonce-([a-zA-Z0-9+/=]+)/;
-              for (const msg of errorMessages) {
-                const match = msg.match(cspViolationPattern);
-                if (match) {
-                  const nonce = match[1];
-                  logs.push(`Nonce found from CSP violation: ${nonce}`);
-                  return nonce;
-                }
-              }
-              
-              // 恢复原始 console.error
-              console.error = originalConsoleError;
-              return null;
-            },
-            // 方法5: 从任何带有 nonce 属性的元素中提取
-            () => {
-              const nonceElements = document.querySelectorAll('[nonce]');
-              if (nonceElements.length > 0) {
-                const nonce = nonceElements[0].getAttribute('nonce');
-                if (nonce) {
-                  logs.push(`Nonce found from element: ${nonce}`);
-                  return nonce;
-                }
-              }
-              return null;
-            }
-          ];
-
-          for (const method of methods) {
-            try {
-              const nonce = method();
-              if (nonce) {
-                return nonce;
-              }
-            } catch (e) {
-              logs.push(`Nonce detection method failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
             }
           }
+          
+          // 方法2: 从 meta 标签中提取 nonce
+          logs.push('Method 2: Checking meta tags...');
+          const metaNonce = document.querySelector('meta[property="csp-nonce"]');
+          if (metaNonce) {
+            const nonce = metaNonce.getAttribute('content');
+            if (nonce) {
+              logs.push(`Nonce found from meta tag: ${nonce}`);
+              return nonce;
+            }
+          } else {
+            logs.push('No meta[property="csp-nonce"] found');
+          }
+          
+          // 方法3: 从 CSP 头部解析 nonce
+          logs.push('Method 3: Checking CSP meta tags...');
+          const cspMetas = document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
+          logs.push(`Found ${cspMetas.length} CSP meta tags`);
+          for (const cspMeta of cspMetas) {
+            const csp = cspMeta.getAttribute('content');
+            if (csp) {
+              logs.push(`CSP content: ${csp}`);
+              const nonceMatch = csp.match(/nonce-([a-zA-Z0-9+/=]+)/);
+              if (nonceMatch) {
+                const nonce = nonceMatch[1];
+                logs.push(`Nonce found from CSP meta: ${nonce}`);
+                return nonce;
+              }
+            }
+          }
+          
+          // 方法4: 从页面的 HTTP 响应头或内联 CSP 中提取 nonce
+          logs.push('Method 4: Checking page source and inline CSP...');
+          try {
+            // 尝试从页面源码中查找 CSP 策略
+            const htmlContent = document.documentElement.outerHTML;
+            const cspMatches = htmlContent.match(/script-src[^"']*'nonce-([a-zA-Z0-9+/=]+)'/g);
+            if (cspMatches) {
+              for (const match of cspMatches) {
+                const nonceMatch = match.match(/'nonce-([a-zA-Z0-9+/=]+)'/);
+                if (nonceMatch) {
+                  const nonce = nonceMatch[1];
+                  logs.push(`Nonce found from page source CSP: ${nonce}`);
+                  return nonce;
+                }
+              }
+            }
+            
+            // 尝试从错误消息中提取（检查控制台历史）
+            const errorPattern = /nonce-([a-zA-Z0-9+/=]+)/;
+            if (window.console && window.console.error) {
+              // 创建一个临时的违规来触发错误
+              const tempScript = document.createElement('script');
+              tempScript.textContent = '// trigger CSP';
+              
+              let cspError: string | null = null;
+              const originalError = window.console.error;
+              window.console.error = function(...args: unknown[]) {
+                const errorMsg = String(args.join(' '));
+                if (errorMsg.includes('Content Security Policy') && errorMsg.includes('nonce-')) {
+                  cspError = errorMsg;
+                  logs.push(`CSP error captured: ${errorMsg}`);
+                }
+                return originalError.apply(window.console, args);
+              };
+              
+              try {
+                document.head.appendChild(tempScript);
+                document.head.removeChild(tempScript);
+              } catch {
+                // Expected CSP violation
+              }
+              window.console.error = originalError;
+              
+              let err = '';
+              if (cspError && typeof cspError === 'string') {
+                err = cspError;
+                const nonceMatch = err.match(errorPattern);
+                if (nonceMatch) {
+                  const nonce = nonceMatch[1];
+                  logs.push(`Nonce extracted from CSP error: ${nonce}`);
+                  return nonce;
+                }
+              }
+            }
+          } catch (e) {
+            logs.push(`Method 4 failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+          }
+          
+          // 方法4.5: 使用 Promise 和异步方式触发 CSP 违规
+          logs.push('Method 4.5: Async CSP violation detection...');
+          try {
+            let asyncDetectedNonce: string | null = null;
+            
+            const asyncHandler = (e: SecurityPolicyViolationEvent) => {
+              logs.push(`Async CSP violation: ${e.violatedDirective}`);
+              logs.push(`Async original policy: ${e.originalPolicy}`);
+              const nonceMatch = e.originalPolicy.match(/'nonce-([a-zA-Z0-9+/=]+)'/);
+              if (nonceMatch) {
+                asyncDetectedNonce = nonceMatch[1];
+                logs.push(`Async nonce extracted: ${asyncDetectedNonce}`);
+              }
+            };
+            
+            document.addEventListener('securitypolicyviolation', asyncHandler);
+            
+            // 使用 setTimeout 来异步触发
+            setTimeout(() => {
+              try {
+                const asyncScript = document.createElement('script');
+                asyncScript.textContent = 'console.log("async test");';
+                document.head.appendChild(asyncScript);
+                document.head.removeChild(asyncScript);
+              } catch {
+                // Expected
+              }
+            }, 0);
+            
+            // 等待一小段时间让事件触发
+            const startTime = Date.now();
+            while (Date.now() - startTime < 50 && !asyncDetectedNonce) {
+              // 短暂等待
+            }
+            
+            document.removeEventListener('securitypolicyviolation', asyncHandler);
+            
+            if (asyncDetectedNonce) {
+              return asyncDetectedNonce;
+            }
+          } catch (error) {
+            logs.push(`Method 4.5 failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          
+          // 方法5: 从任何带有 nonce 属性的元素中提取
+          logs.push('Method 5: Checking all elements with nonce...');
+          const nonceElements = document.querySelectorAll('[nonce]');
+          logs.push(`Found ${nonceElements.length} elements with nonce attribute`);
+          if (nonceElements.length > 0) {
+            // 检查前几个元素的 nonce 值
+            for (let i = 0; i < Math.min(nonceElements.length, 10); i++) {
+              const element = nonceElements[i];
+              const nonce = element.getAttribute('nonce');
+              logs.push(`Element ${i} (${element.tagName}) nonce: "${nonce}"`);
+              if (nonce && nonce.trim()) {
+                logs.push(`Nonce found from element ${i}: ${nonce}`);
+                return nonce;
+              }
+            }
+            logs.push('All checked elements have empty or null nonce values');
+          }
+          
+          logs.push('All nonce detection methods failed');
           return null;
         }
         

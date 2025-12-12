@@ -1,73 +1,76 @@
-# React + TypeScript + Vite
+# CarryMonkey
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+CarryMonkey is a powerful browser extension that allows you to manage and inject custom user scripts into web pages. It is designed to be a modern, lightweight, and secure alternative to other script managers.
 
-Currently, two official plugins are available:
+## ✨ Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Script Management**: Easily create, edit, and manage your user scripts.
+- **Automatic Injection**: Scripts are automatically injected into pages that match their defined patterns.
+- **Content Security Policy (CSP) Handling**: Advanced nonce detection to bypass strict CSP rules.
+- **Modern UI**: A clean and intuitive user interface built with React and TypeScript.
+- **Secure**: Uses Trusted Types to prevent DOM XSS attacks.
+- **Lightweight**: Built with Vite for a fast and efficient development experience.
 
-## React Compiler
+## 🚀 Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Prerequisites
 
-## Expanding the ESLint configuration
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [pnpm](https://pnpm.io/) (recommended)
+    ```bash
+    brew install node
+    brew install pnpm
+    ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Installation
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/carrymonkey.git
+    cd carrymonkey
+    ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+2.  **Install dependencies:**
+    ```bash
+    pnpm install
+    ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+3.  **Build the extension:**
+    ```bash
+    pnpm build
+    ```
+
+### Loading the Extension
+
+1.  Open Google Chrome and navigate to `chrome://extensions`.
+2.  Enable **Developer mode** in the top right corner.
+3.  Click **Load unpacked**.
+4.  Select the `dist` folder in the project directory.
+
+## 🛠️ Development
+
+To start the development server with hot-reloading, run:
+
+```bash
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+This will watch for changes and automatically rebuild the extension. You will need to manually reload the extension in `chrome://extensions` to see the changes.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 📦 Building for Production
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+To build the extension for production, run:
+
+```bash
+pnpm build
 ```
+
+This will create an optimized build in the `dist` folder, ready to be packed and published.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss any changes.
+
+## 📄 License
+
+This project is licensed under the MIT License.
