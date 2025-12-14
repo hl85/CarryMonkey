@@ -1,20 +1,18 @@
-import type { UserScript } from '../types';
+import type { UserScript } from '../core/types';
+import { ScriptResourceManager } from './script-resource-manager';
 
+/**
+ * 加载脚本依赖（已废弃）
+ * 请使用 ScriptResourceManager.cacheDependencies() 代替
+ * @deprecated 使用 ScriptResourceManager.cacheDependencies() 代替
+ */
 export async function loadDependencies(script: UserScript): Promise<void> {
+  console.warn('[DEPRECATED] loadDependencies is deprecated. Use ScriptResourceManager.cacheDependencies() instead.');
+  
   if (!script.meta.require || script.meta.require.length === 0) {
     return;
   }
 
-  for (const url of script.meta.require) {
-    try {
-      const response = await fetch(url);
-      await response.text();
-      // In a real browser environment, you would inject this script into the page.
-      // For example, by creating a <script> element.
-      console.log(`Loading dependency: ${url}`);
-      // eval(scriptContent); // Be very careful with eval in a real application!
-    } catch (error) {
-      console.error(`Failed to load dependency: ${url}`, error);
-    }
-  }
+  const resourceManager = ScriptResourceManager.getInstance();
+  await resourceManager.cacheDependencies(script.meta.require);
 }

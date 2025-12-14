@@ -2,6 +2,10 @@ export type Grant =
   | "GM_setValue"
   | "GM_getValue"
   | "GM_setClipboard"
+  | "GM_getResourceText"
+  | "GM_getResourceURL"
+  | "GM_addStyle"
+  | "GM_xmlhttpRequest"
   | "unsafeWindow"
   | "window.close"
   | "window.focus"
@@ -14,6 +18,13 @@ export type RunAt =
   | "document-end"
   | "document-idle"
   | "context-menu";
+
+export interface InjectionStrategy {
+  method: 'content-script' | 'userscripts-api' | 'userscripts-dynamic';
+  world: 'MAIN' | 'USER_SCRIPT';
+  timing: 'document_start' | 'document_end' | 'document_idle';
+  reason: string;
+}
 
 export interface UserScript {
   id: string;
@@ -34,9 +45,15 @@ export interface UserScript {
     supportURL: string;
     require: string[];
     compatible: string[];
+    connect: string[];
+    resource: Record<string, string>;
     downloadURL: string;
     updateURL: string;
     "run-at": RunAt;
+    sandbox?: 'raw' | 'JavaScript' | 'DOM';
+    // 注入策略缓存
+    _injectionStrategy?: InjectionStrategy;
   };
   lastUpdated: number;
 }
+

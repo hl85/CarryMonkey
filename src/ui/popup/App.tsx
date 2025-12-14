@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Menu } from 'antd';
 import { SettingOutlined, FileTextOutlined } from '@ant-design/icons';
-import { getScripts } from '../storage';
-import type { UserScript } from '../types';
+import { getScripts } from '../../core/storage';
+import type { UserScript } from '../../core/types';
 import type { MenuProps } from 'antd';
 
 const App: React.FC = () => {
@@ -16,9 +16,9 @@ const App: React.FC = () => {
       if (tab.url) {
         const allScripts = await getScripts();
         // We only show enabled scripts in the popup.
-        const matched = allScripts.filter(script =>
-          script.enabled && 
-          script.meta.match.some(pattern => new RegExp(pattern.replace(/\*/g, '.*')).test(tab.url!))
+        const matched = allScripts.filter((script: UserScript) =>
+          script.enabled &&
+          script.meta.match.some((pattern: string) => new RegExp(pattern.replace(/\*/g, '.*')).test(tab.url!))
         );
         setMatchedScripts(matched);
       }

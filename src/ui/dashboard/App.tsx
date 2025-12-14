@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout, Menu, Table, Switch, Input, Button, Space, message, Modal } from 'antd'
 import { PlusOutlined, FileTextOutlined, DeleteOutlined } from '@ant-design/icons'
-import { getScripts, saveScript, deleteScripts, updateScript } from '../storage'
-import type { UserScript, Grant } from '../types'
+import { getScripts, saveScript, deleteScripts, updateScript } from '../../core/storage'
+import type { UserScript, Grant } from '../../core/types'
 
 const { Header, Sider, Content } = Layout
 
@@ -47,6 +47,8 @@ const parseUserScriptMeta = (content: string): UserScript['meta'] => {
     supportURL: '',
     require: [],
     compatible: [],
+    connect: [],
+    resource: {},
     downloadURL: '',
     updateURL: '',
     'run-at': 'document-end',

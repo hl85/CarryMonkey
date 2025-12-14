@@ -1,4 +1,4 @@
-import type { UserScript } from '../types';
+import type { UserScript } from '../core/types';
 
 export async function checkForUpdates(script: UserScript): Promise<boolean> {
   if (!script.meta.updateURL) {
