@@ -1,57 +1,56 @@
-import type { UserScript, Grant, RunAt } from '../core/types';
+import type { UserScript, Grant, RunAt } from "../core/types";
 
 export function parseUserScript(content: string): Partial<UserScript> {
+  const meta: Partial<UserScript["meta"]> & {
+    [key: string]: string | string[];
+  } = {
+    name: "",
+    namespace: "",
 
-  const meta: Partial<UserScript['meta']> & { [key: string]: string | string[] } = {
-    name: '',
-    namespace: '',
-
-    version: '',
-    description: '',
-    author: '',
+    version: "",
+    description: "",
+    author: "",
     match: [],
-    icon: '',
+    icon: "",
     grant: [],
-    copyright: '',
-    license: '',
-    source: '',
-    supportURL: '',
+    copyright: "",
+    license: "",
+    source: "",
+    supportURL: "",
     require: [],
     compatible: [],
-    downloadURL: '',
-    updateURL: '',
-    'run-at': 'document-idle',
+    downloadURL: "",
+    updateURL: "",
+    "run-at": "document-idle",
   };
-  
-  const lines = content.split('\\n');
+
+  const lines = content.split("\\n");
 
   for (const line of lines) {
-    if (line.trim().startsWith('// ==/UserScript==')) {
+    if (line.trim().startsWith("// ==/UserScript==")) {
       break;
     }
-    if (line.trim().startsWith('// @')) {
-      const parts = line.trim().substring(4).split(' ');
+    if (line.trim().startsWith("// @")) {
+      const parts = line.trim().substring(4).split(" ");
       const key = parts.shift();
-      const value = parts.join(' ').trim();
+      const value = parts.join(" ").trim();
       if (key && value) {
-        if (key === 'grant') {
+        if (key === "grant") {
           meta.grant!.push(value as Grant);
-        } else if (['match', 'require', 'compatible'].includes(key)) {
+        } else if (["match", "require", "compatible"].includes(key)) {
           (meta[key as keyof typeof meta] as string[])?.push(value);
-        } else if (key === 'run-at') {
-          meta['run-at'] = value as RunAt;
+        } else if (key === "run-at") {
+          meta["run-at"] = value as RunAt;
         } else {
           // Handle other string properties
           meta[key] = value;
         }
-
-
       }
     }
   }
 
   return {
     content,
-    meta: meta as UserScript['meta'],
+    meta: meta as UserScript["meta"],
   };
 }

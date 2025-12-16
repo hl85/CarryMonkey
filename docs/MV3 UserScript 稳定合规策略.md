@@ -4,7 +4,7 @@
 
 随着 Chrome 扩展平台从 Manifest V2 (MV2) 向 Manifest V3 (MV3) 的全面迁移，浏览器扩展的开发范式经历了根本性的重构。在 MV3 的安全模型中，最核心的变革之一是严厉禁止扩展程序执行“远程托管代码”（Remotely Hosted Code, RHC）。这一政策旨在消除扩展程序动态加载未经过 Chrome 应用商店（CWS）审查代码的安全隐患。然而，这一限制直接冲击了“用户脚本管理器”（User Script Managers, 如 Tampermonkey、Violentmonkey）的核心功能，因为这类扩展的本质即是执行用户提供的、动态的 JavaScript 代码。
 
-为了在保障安全的前提下维持这一生态的活力，Chrome 团队引入了专用的 chrome.userScripts API。本报告基于 Chrome 官方文档及 2024-2025 年间的最新技术实践，对 MV3 标准下使用 UserScript 的策略进行了详尽的分析。研究表明，最稳定且合规的策略是构建一个基于 USER\_SCRIPT 执行环境（Execution World）的混合架构：利用 chrome.userScripts API 进行代码注入，通过 configureWorld 配置放宽的内容安全策略（CSP）以支持 eval，并建立基于 runtime.onUserScriptMessage 的专用通信桥梁，以在隔离的脚本环境与拥有特权的 Service Worker 之间安全地代理高级 API 调用（如 GM\_xmlHttpRequest）。
+为了在保障安全的前提下维持这一生态的活力，Chrome 团队引入了专用的 chrome.userScripts API。本报告基于 Chrome 官方文档及 2024-2025 年间的最新技术实践，对 MV3 标准下使用 UserScript 的策略进行了详尽的分析。研究表明，最稳定且合规的策略是构建一个基于 USER_SCRIPT 执行环境（Execution World）的混合架构：利用 chrome.userScripts API 进行代码注入，通过 configureWorld 配置放宽的内容安全策略（CSP）以支持 eval，并建立基于 runtime.onUserScriptMessage 的专用通信桥梁，以在隔离的脚本环境与拥有特权的 Service Worker 之间安全地代理高级 API 调用（如 GM_xmlHttpRequest）。
 
 此外，随着 Chrome 133、135 及 138 版本的迭代，开发者必须适配从“开发者模式”开关向“允许用户脚本”独立开关的 UI 变迁，并利用新增的 execute() 方法实现即时脚本执行。本报告将详细阐述这些架构细节、合规性要求及代码实现。
 
@@ -33,8 +33,8 @@ Manifest V3 的核心宗旨之一是“默认安全”。为此，Google 实施�
 
 在使用策略上，最大的变数在于用户授权机制的演进。这直接影响到用户引导流程的设计。
 
-* **Chrome 138 之前**：为了启用 userScripts API，Chrome 强制要求用户必须在浏览器设置中开启全局的“开发者模式”（Developer Mode） 4。这是一个临时的、高摩擦的解决方案。因为开发者模式不仅开启了脚本权限，还暴露了许多高级调试功能，这对普通用户来说既不友好也不安全，且常被企业策略（Enterprise Policy）禁用 6。
-* **Chrome 138 及以后（已实施）**：从 Chrome 138 开始，Chrome 将引入一个精细化的“允许用户脚本”（Allow User Scripts）开关，位于每个扩展的详情页面中 6。这意味着用户不再需要开启全局开发者模式，只需针对特定扩展授权即可。
+- **Chrome 138 之前**：为了启用 userScripts API，Chrome 强制要求用户必须在浏览器设置中开启全局的“开发者模式”（Developer Mode） 4。这是一个临时的、高摩擦的解决方案。因为开发者模式不仅开启了脚本权限，还暴露了许多高级调试功能，这对普通用户来说既不友好也不安全，且常被企业策略（Enterprise Policy）禁用 6。
+- **Chrome 138 及以后（已实施）**：从 Chrome 138 开始，Chrome 将引入一个精细化的“允许用户脚本”（Allow User Scripts）开关，位于每个扩展的详情页面中 6。这意味着用户不再需要开启全局开发者模式，只需针对特定扩展授权即可。
 
 因此，最稳定的策略必须包含一套能够动态检测当前浏览器版本并给出正确用户引导的逻辑。
 
@@ -42,13 +42,12 @@ Manifest V3 的核心宗旨之一是“默认安全”。为此，Google 实施�
 
 在 MV3 中，UserScript 的执行不再依赖于通用的 tabs 或 scripting API，而是拥有一套独立的架构。这套架构的核心概念是“执行世界”（Execution World）。
 
-### **3.1 执行世界的隔离机制：USER\_SCRIPT World**
+### **3.1 执行世界的隔离机制：USER_SCRIPT World**
 
 在浏览器中，JavaScript 的执行环境被划分为不同的“世界”（Worlds），每个世界拥有独立的全局变量（window 对象）和原型链，但共享同一个 DOM（文档对象模型）。
 
-
-| 特性              | 主世界 (MAIN World) | 隔离世界 (ISOLATED World)  | 用户脚本世界 (USER\_SCRIPT World)  |
-| :------------------ | :-------------------- | :--------------------------- | :----------------------------------- |
+| 特性              | 主世界 (MAIN World) | 隔离世界 (ISOLATED World)  | 用户脚本世界 (USER_SCRIPT World)   |
+| :---------------- | :------------------ | :------------------------- | :--------------------------------- |
 | **主要使用者**    | 网页本身的 JS       | 扩展的 Content Scripts     | **UserScripts (MV3)**              |
 | **DOM 访问权限**  | 完全访问            | 完全访问                   | 完全访问                           |
 | **JS 变量可见性** | 对网页可见          | 与网页隔离                 | **与网页及扩展均隔离**             |
@@ -59,8 +58,8 @@ Manifest V3 的核心宗旨之一是“默认安全”。为此，Google 实施�
 数据综合自 4
 
 关键洞察：
-最稳定的策略是显式指定脚本运行在 USER\_SCRIPT 世界中。虽然 API 允许脚本运行在 MAIN 世界 4，但这会使脚本受到宿主网页内容安全策略（CSP）的限制。例如，如果网页的 CSP 禁止 unsafe-eval（大多数现代网站如 GitHub, Twitter 都是如此），那么运行在 MAIN 世界的用户脚本将无法使用 eval() 或 new Function()，导致大量现有脚本失效 8。
-相比之下，USER\_SCRIPT 世界是 MV3 专门为用户脚本开辟的“法外之地”。它允许扩展程序通过 chrome.userScripts.configureWorld() 方法，为这个特定的世界定义一套独立的 CSP 4。这意味着，即使宿主网页严格禁止 eval，扩展程序依然可以配置 USER\_SCRIPT 世界允许 unsafe-eval，从而保证 Tampermonkey 等工具的兼容性。
+最稳定的策略是显式指定脚本运行在 USER_SCRIPT 世界中。虽然 API 允许脚本运行在 MAIN 世界 4，但这会使脚本受到宿主网页内容安全策略（CSP）的限制。例如，如果网页的 CSP 禁止 unsafe-eval（大多数现代网站如 GitHub, Twitter 都是如此），那么运行在 MAIN 世界的用户脚本将无法使用 eval() 或 new Function()，导致大量现有脚本失效 8。
+相比之下，USER_SCRIPT 世界是 MV3 专门为用户脚本开辟的“法外之地”。它允许扩展程序通过 chrome.userScripts.configureWorld() 方法，为这个特定的世界定义一套独立的 CSP 4。这意味着，即使宿主网页严格禁止 eval，扩展程序依然可以配置 USER_SCRIPT 世界允许 unsafe-eval，从而保证 Tampermonkey 等工具的兼容性。
 
 ### **3.2 动态注册与持久化**
 
@@ -78,15 +77,15 @@ chrome.userScripts API 的运作模式与 MV2 的即时注入不同，它采用�
 
 ## **4\. 核心策略一：配置宽容的执行环境**
 
-为了确保用户脚本（通常包含大量遗留代码、依赖 eval 进行元编程或沙箱化）能够稳定运行，首要任务是配置一个宽容的 USER\_SCRIPT 环境。
+为了确保用户脚本（通常包含大量遗留代码、依赖 eval 进行元编程或沙箱化）能够稳定运行，首要任务是配置一个宽容的 USER_SCRIPT 环境。
 
 ### **4.1 启用 unsafe-eval**
 
-在 MV3 中，默认的扩展 CSP 极其严格，禁止一切形式的代码动态生成。但在 USER\_SCRIPT 世界中，我们可以通过配置绕过这一限制。这是合规策略中最微妙但也最关键的一步：CWS 允许在 configureWorld 中开启 unsafe-eval，因为这些代码运行在低权限的沙箱中，不会危及扩展本身的安全。
+在 MV3 中，默认的扩展 CSP 极其严格，禁止一切形式的代码动态生成。但在 USER_SCRIPT 世界中，我们可以通过配置绕过这一限制。这是合规策略中最微妙但也最关键的一步：CWS 允许在 configureWorld 中开启 unsafe-eval，因为这些代码运行在低权限的沙箱中，不会危及扩展本身的安全。
 
 ### **4.2 开启消息通信（Messaging）**
 
-由于 USER\_SCRIPT 世界无法直接访问 chrome.runtime 或 chrome.storage 等 API，脚本必须通过消息传递与扩展的后台（Service Worker）进行通信，以请求数据存储或跨域请求（XHR）。默认情况下，USER\_SCRIPT 世界的消息通信是关闭的，必须显式开启 4。
+由于 USER_SCRIPT 世界无法直接访问 chrome.runtime 或 chrome.storage 等 API，脚本必须通过消息传递与扩展的后台（Service Worker）进行通信，以请求数据存储或跨域请求（XHR）。默认情况下，USER_SCRIPT 世界的消息通信是关闭的，必须显式开启 4。
 
 ### **4.3 代码实现样例：环境配置**
 
@@ -129,18 +128,18 @@ setupUserScriptWorld();
 
 ## **5\. 核心策略二：构建双向通信桥梁（The Bridge）**
 
-在 MV2 中，Tampermonkey 等工具通过复杂的技巧将 GM\_xmlHttpRequest 等特权函数暴露给页面。在 MV3 中，这种直接暴露被严格禁止。最稳定的策略是构建一个“用户脚本-服务脚本”架构的通信桥梁。
+在 MV2 中，Tampermonkey 等工具通过复杂的技巧将 GM_xmlHttpRequest 等特权函数暴露给页面。在 MV3 中，这种直接暴露被严格禁止。最稳定的策略是构建一个“用户脚本-服务脚本”架构的通信桥梁。
 
-* **用户脚本端**：注入到页面的用户脚本环境。通过 chrome.runtime.sendMessage 发送请求。
-* **服务脚本端**：扩展的 Service Worker。监听 chrome.runtime.onUserScriptMessage，执行实际的特权操作（如 fetch、storage 操作），并将结果返回。
+- **用户脚本端**：注入到页面的用户脚本环境。通过 chrome.runtime.sendMessage 发送请求。
+- **服务脚本端**：扩展的 Service Worker。监听 chrome.runtime.onUserScriptMessage，执行实际的特权操作（如 fetch、storage 操作），并将结果返回。
 
 ### **5.1 专用消息通道 onUserScriptMessage**
 
-MV3 引入了 chrome.runtime.onUserScriptMessage 事件，专门用于接收来自 USER\_SCRIPT 世界的消息 4。使用这个专用通道而不是通用的 onMessage 至关重要，因为它允许浏览器和开发者区分消息来源，从而在处理来自不可信代码（用户脚本）的请求时实施更严格的安全检查。
+MV3 引入了 chrome.runtime.onUserScriptMessage 事件，专门用于接收来自 USER_SCRIPT 世界的消息 4。使用这个专用通道而不是通用的 onMessage 至关重要，因为它允许浏览器和开发者区分消息来源，从而在处理来自不可信代码（用户脚本）的请求时实施更严格的安全检查。
 
-### **5.2 模拟 GM\_xmlHttpRequest 的挑战与解决方案**
+### **5.2 模拟 GM_xmlHttpRequest 的挑战与解决方案**
 
-用户脚本最常用的功能之一是跨域请求（GM\_xmlHttpRequest）。在 MV3 Service Worker 中，XMLHttpRequest 对象已不复存在，必须使用 fetch API 进行替代 16。
+用户脚本最常用的功能之一是跨域请求（GM_xmlHttpRequest）。在 MV3 Service Worker 中，XMLHttpRequest 对象已不复存在，必须使用 fetch API 进行替代 16。
 
 **技术难点**：
 
@@ -398,7 +397,7 @@ const version \= parseInt(navigator.userAgent.match(/Chrome\\/(\\d+)/)?. |
 if (version \>= 138) {
 // Chrome 138+：引导用户去扩展管理页开启 "Allow User Scripts"
 const extensionId \= chrome.runtime.id;
-alert(\`请在扩展设置页中开启“允许用户脚本”权限。\\n地址: chrome://extensions/?id=${extensionId}\`);  
+alert(\`请在扩展设置页中开启“允许用户脚本”权限。\\n地址: chrome://extensions/?id=${extensionId}\`);
 chrome.tabs.create({ url: \`chrome://extensions/?id=${extensionId}\` });
 } else {
 // Chrome \< 138：引导用户开启“开发者模式”
@@ -415,16 +414,16 @@ chrome.tabs.create({ url: "chrome://extensions" });
 
 在制定策略时，不能忽视 Firefox 和 Safari 等其他浏览器的实现差异，尽管本报告聚焦于 Chrome。
 
-* **Firefox**：Mozilla 的 MV3 实现较为激进地保留了对用户脚本的更好支持，且其 userScripts API 语法略有不同（例如事件监听器可能需要 scripting 权限配合）。但核心的 register 和 onUserScriptMessage 机制正在趋同。
-* **Safari**：Safari 的 Web Extension 实现通常滞后，但在标准化组织（WECG）的推动下，userScripts API 最终有望成为跨浏览器的标准 5。
+- **Firefox**：Mozilla 的 MV3 实现较为激进地保留了对用户脚本的更好支持，且其 userScripts API 语法略有不同（例如事件监听器可能需要 scripting 权限配合）。但核心的 register 和 onUserScriptMessage 机制正在趋同。
+- **Safari**：Safari 的 Web Extension 实现通常滞后，但在标准化组织（WECG）的推动下，userScripts API 最终有望成为跨浏览器的标准 5。
 
 ### **展望：Chrome 145 与未来**
 
 根据发布计划，Chrome 145 将进一步稳定 API 并可能调整发布时间表 17。对于开发者而言，当前的策略应当是：
 
-1. **全面拥抱 USER\_SCRIPT world**：停止使用 ISOLATED world 来运行用户代码。
+1. **全面拥抱 USER_SCRIPT world**：停止使用 ISOLATED world 来运行用户代码。
 2. **消息通信为王**：所有特权操作必须通过消息桥接。
-3. **关注 worldId**：在 Chrome 133 中引入的 worldId 参数允许扩展创建多个独立的用户脚本世界（例如 worldId: 'UserScripts\_A' 和 worldId: 'UserScripts\_B'），这为脚本之间的隔离提供了更细粒度的控制，是未来构建复杂脚本管理器（如支持不同脚本集运行在不同沙箱）的关键 13。
+3. **关注 worldId**：在 Chrome 133 中引入的 worldId 参数允许扩展创建多个独立的用户脚本世界（例如 worldId: 'UserScripts_A' 和 worldId: 'UserScripts_B'），这为脚本之间的隔离提供了更细粒度的控制，是未来构建复杂脚本管理器（如支持不同脚本集运行在不同沙箱）的关键 13。
 
 ## **9\. 结论**
 
@@ -440,8 +439,8 @@ chrome.tabs.create({ url: "chrome://extensions" });
 4. chrome.userScripts | API \- Chrome for Developers, 访问时间为 12月 15, 2025， [https://developer.chrome.com/docs/extensions/reference/api/userScripts](https://developer.chrome.com/docs/extensions/reference/api/userScripts)
 5. User scripts in Manifest V3 \#279 \- w3c/webextensions \- GitHub, 访问时间为 12月 15, 2025， [https://github.com/w3c/webextensions/issues/279](https://github.com/w3c/webextensions/issues/279)
 6. Enabling chrome.userScripts in Chrome Extensions is changing | Blog, 访问时间为 12月 15, 2025， [https://developer.chrome.com/blog/chrome-userscript](https://developer.chrome.com/blog/chrome-userscript)
-7. content\_security\_policy \- Mozilla \- MDN Web Docs, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content\_security\_policy](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content_security_policy)
-8. User Scripts vs injected scripts with eval() \- Google Groups, 访问时间为 12月 15, 2025， [https://groups.google.com/a/chromium.org/g/chromium-extensions/c/W2J8\_81NzkM/m/ujyICaiTAQAJ](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/W2J8_81NzkM/m/ujyICaiTAQAJ)
+7. content_security_policy \- Mozilla \- MDN Web Docs, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content_security_policy](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content_security_policy)
+8. User Scripts vs injected scripts with eval() \- Google Groups, 访问时间为 12月 15, 2025， [https://groups.google.com/a/chromium.org/g/chromium-extensions/c/W2J8_81NzkM/m/ujyICaiTAQAJ](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/W2J8_81NzkM/m/ujyICaiTAQAJ)
 9. Workaround for unsafe-eval not being in CSP Chrome? · Issue \#1984 \- GitHub, 访问时间为 12月 15, 2025， [https://github.com/Tampermonkey/tampermonkey/issues/1984](https://github.com/Tampermonkey/tampermonkey/issues/1984)
 10. userScripts \- Mozilla \- MDN Web Docs, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts)
 11. Where and how long are values stored by user scripts persisted? \- Stack Overflow, 访问时间为 12月 15, 2025， [https://stackoverflow.com/questions/75970960/where-and-how-long-are-values-stored-by-user-scripts-persisted](https://stackoverflow.com/questions/75970960/where-and-how-long-are-values-stored-by-user-scripts-persisted)
@@ -449,6 +448,6 @@ chrome.tabs.create({ url: "chrome://extensions" });
 13. PSA: userScripts.execute() and multiple world support in User Scripts API \- Google Groups, 访问时间为 12月 15, 2025， [https://groups.google.com/a/chromium.org/g/chromium-extensions/c/oEo-Jm0EqsY](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/oEo-Jm0EqsY)
 14. Content-Security-Policy: script-src directive \- HTTP \- MDN Web Docs \- Mozilla, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src)
 15. runtime.onUserScriptMessage \- Mozilla \- MDN Web Docs, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/onUserScriptMessage](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/onUserScriptMessage)
-16. \[Feature\] Manifest V3 for Chrome · Issue \#1934 \- GitHub, 访问时间为 12月 15, 2025， [https://github.com/violentmonkey/violentmonkey/issues/1934?timeline\_page=1](https://github.com/violentmonkey/violentmonkey/issues/1934?timeline_page=1)
+16. \[Feature\] Manifest V3 for Chrome · Issue \#1934 \- GitHub, 访问时间为 12月 15, 2025， [https://github.com/violentmonkey/violentmonkey/issues/1934?timeline_page=1](https://github.com/violentmonkey/violentmonkey/issues/1934?timeline_page=1)
 17. Previous release notes \- Chrome Enterprise and Education Help, 访问时间为 12月 15, 2025， [https://support.google.com/chrome/a/answer/10314655?hl=en](https://support.google.com/chrome/a/answer/10314655?hl=en)
 18. userScripts.execute() \- Mozilla \- MDN Web Docs, 访问时间为 12月 15, 2025， [https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts/execute](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts/execute)

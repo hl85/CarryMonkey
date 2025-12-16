@@ -4,15 +4,15 @@
  * 仅使用官方 API，不包含任何动态代码执行
  */
 
-import type { UserScript, InjectionStrategy } from '../../core/types';
-import { UserScriptsAPIManager } from '../userscripts-api';
-import { InjectionUtils } from './utils';
-import { CompliantScriptExecutor } from './compliant-executor';
-import { isFeatureEnabled } from '../../config/feature-flags';
-import { createComponentLogger } from '../logger';
+import type { UserScript, InjectionStrategy } from "../../core/types";
+import { UserScriptsAPIManager } from "../userscripts-api";
+import { InjectionUtils } from "./utils";
+import { CompliantScriptExecutor } from "./compliant-executor";
+import { isFeatureEnabled } from "../../config/feature-flags";
+import { createComponentLogger } from "../logger";
 
 // 创建合规注入策略专用日志器
-const compliantLogger = createComponentLogger('CompliantInjection');
+const compliantLogger = createComponentLogger("CompliantInjection");
 
 export class CompliantInjectionStrategy {
   /**
@@ -20,74 +20,82 @@ export class CompliantInjectionStrategy {
    */
   static async inject(script: UserScript, tabId: number): Promise<void> {
     const startTime = performance.now();
-    
-    compliantLogger.info('Starting compliant script injection', {
+
+    compliantLogger.info("Starting compliant script injection", {
       scriptId: script.id,
       scriptName: script.meta.name,
       tabId,
-      action: 'compliant-injection-start'
+      action: "compliant-injection-start",
     });
-    
+
     // 验证脚本是否符合合规要求
     const validation = CompliantScriptExecutor.validateScriptContent(script);
     if (!validation.safe) {
-      compliantLogger.warn('Script validation failed', {
+      compliantLogger.warn("Script validation failed", {
         scriptId: script.id,
         scriptName: script.meta.name,
         issues: validation.issues,
-        action: 'validation-failed'
+        action: "validation-failed",
       });
-      
+
       // 在严格合规模式下，拒绝执行不安全的脚本
-      if (isFeatureEnabled('storeCompliant')) {
-        compliantLogger.error('Rejecting non-compliant script in strict mode', {
+      if (isFeatureEnabled("storeCompliant")) {
+        compliantLogger.error("Rejecting non-compliant script in strict mode", {
           scriptId: script.id,
           scriptName: script.meta.name,
-          issues: validation.issues
+          issues: validation.issues,
         });
-        throw new Error(`Script ${script.meta.name} contains non-compliant code: ${validation.issues.join(', ')}`);
+        throw new Error(
+          `Script ${script.meta.name} contains non-compliant code: ${validation.issues.join(", ")}`,
+        );
       }
     } else {
-      compliantLogger.debug('Script validation passed', {
+      compliantLogger.debug("Script validation passed", {
         scriptId: script.id,
-        action: 'validation-passed'
+        action: "validation-passed",
       });
     }
-    
+
     // 优先使用 UserScripts API（合规方式）
     if (await this.canUseUserScriptsAPI()) {
-      compliantLogger.debug('Using UserScripts API for injection', {
+      compliantLogger.debug("Using UserScripts API for injection", {
         scriptId: script.id,
-        method: 'userscripts-api'
+        method: "userscripts-api",
       });
       await this.injectViaUserScripts(script);
-      
+
       const duration = performance.now() - startTime;
-      compliantLogger.info('Compliant injection completed via UserScripts API', {
-        scriptId: script.id,
-        scriptName: script.meta.name,
-        method: 'userscripts-api',
-        duration: Math.round(duration * 100) / 100,
-        action: 'injection-success'
-      });
+      compliantLogger.info(
+        "Compliant injection completed via UserScripts API",
+        {
+          scriptId: script.id,
+          scriptName: script.meta.name,
+          method: "userscripts-api",
+          duration: Math.round(duration * 100) / 100,
+          action: "injection-success",
+        },
+      );
       return;
     }
-    
+
     // 降级到 chrome.scripting API（合规方式）
-    compliantLogger.debug('Falling back to chrome.scripting API', {
+    compliantLogger.debug("Falling back to chrome.scripting API", {
       scriptId: script.id,
-      method: 'chrome-scripting'
+      method: "chrome-scripting",
     });
     await this.injectViaScripting(script, tabId);
-    
+
     const duration = performance.now() - startTime;
-    compliantLogger.info('Compliant injection completed via chrome.scripting API', {
-      scriptId: script.id,
-      scriptName: script.meta.name,
-      method: 'chrome-scripting',
-      duration: Math.round(duration * 100) / 100,
-      action: 'injection-success'
-    });
+    compliantLogger.info(
+      "Compliant injection completed via chrome.scripting API",
+      {
+        scriptId: script.id,
+        scriptName: script.meta.name,
+        method: "chrome-scripting",
+        duration: Math.round(duration * 100) / 100,
+        action: "injection-success",
+      },
+    );
   }
 
   /**
@@ -95,55 +103,61 @@ export class CompliantInjectionStrategy {
    */
   private static async injectViaUserScripts(script: UserScript): Promise<void> {
     const strategy: InjectionStrategy = {
-      method: 'userscripts-dynamic',
-      world: 'USER_SCRIPT',
-      timing: InjectionUtils.convertRunAtTiming(script.meta['run-at']),
-      reason: 'Using UserScripts API for compliant execution'
+      method: "userscripts-dynamic",
+      world: "USER_SCRIPT",
+      timing: InjectionUtils.convertRunAtTiming(script.meta["run-at"]),
+      reason: "Using UserScripts API for compliant execution",
     };
 
-    compliantLogger.debug('Registering script with UserScripts API', {
+    compliantLogger.debug("Registering script with UserScripts API", {
       scriptId: script.id,
       strategy: strategy.method,
       world: strategy.world,
-      timing: strategy.timing
+      timing: strategy.timing,
     });
 
     // 使用合规的 UserScripts API 注册（不使用包装器）
     await UserScriptsAPIManager.registerScriptCompliant(script, strategy);
-    
-    compliantLogger.debug('Script registered successfully with UserScripts API', {
-      scriptId: script.id
-    });
+
+    compliantLogger.debug(
+      "Script registered successfully with UserScripts API",
+      {
+        scriptId: script.id,
+      },
+    );
   }
 
   /**
    * 通过 chrome.scripting API 注入（合规方式）
    */
-  private static async injectViaScripting(script: UserScript, tabId: number): Promise<void> {
+  private static async injectViaScripting(
+    script: UserScript,
+    tabId: number,
+  ): Promise<void> {
     const needsIsolation = InjectionUtils.needsIsolation(script);
     const world = InjectionUtils.getWorldString(needsIsolation);
 
-    compliantLogger.debug('Analyzing script isolation requirements', {
+    compliantLogger.debug("Analyzing script isolation requirements", {
       scriptId: script.id,
       needsIsolation,
       world,
-      grants: script.meta.grant || []
+      grants: script.meta.grant || [],
     });
 
     // 注入 API Bridge（如果需要隔离）
     if (needsIsolation) {
-      compliantLogger.debug('Injecting API bridge for isolated execution', {
+      compliantLogger.debug("Injecting API bridge for isolated execution", {
         scriptId: script.id,
-        tabId
+        tabId,
       });
       await InjectionUtils.injectAPIBridge(tabId, script.id);
     }
 
-    compliantLogger.debug('Executing script via chrome.scripting API', {
+    compliantLogger.debug("Executing script via chrome.scripting API", {
       scriptId: script.id,
       tabId,
       world,
-      executor: 'compliant'
+      executor: "compliant",
     });
 
     // 使用合规的脚本执行器
@@ -153,11 +167,14 @@ export class CompliantInjectionStrategy {
       args: [script.content, script.meta.name],
       world: world as chrome.scripting.ExecutionWorld,
     });
-    
-    compliantLogger.debug('Script execution completed via chrome.scripting API', {
-      scriptId: script.id,
-      tabId
-    });
+
+    compliantLogger.debug(
+      "Script execution completed via chrome.scripting API",
+      {
+        scriptId: script.id,
+        tabId,
+      },
+    );
   }
 
   /**
@@ -170,20 +187,24 @@ export class CompliantInjectionStrategy {
   /**
    * 获取策略信息
    */
-  static getStrategyInfo(): { name: string; compliant: boolean; features: string[] } {
+  static getStrategyInfo(): {
+    name: string;
+    compliant: boolean;
+    features: string[];
+  } {
     return {
-      name: 'Fully Compliant Injection Strategy',
+      name: "Fully Compliant Injection Strategy",
       compliant: true,
       features: [
-        'UserScripts API support (no wrappers)',
-        'chrome.scripting API fallback',
-        'Script content validation',
-        'No eval() usage',
-        'No Function constructor',
-        'Trusted Types support',
-        'CSP nonce support',
-        'MV3 fully compliant'
-      ]
+        "UserScripts API support (no wrappers)",
+        "chrome.scripting API fallback",
+        "Script content validation",
+        "No eval() usage",
+        "No Function constructor",
+        "Trusted Types support",
+        "CSP nonce support",
+        "MV3 fully compliant",
+      ],
     };
   }
 
@@ -193,17 +214,17 @@ export class CompliantInjectionStrategy {
   static getComplianceInfo() {
     return {
       restrictions: [
-        'No dynamic code execution (eval, Function constructor)',
-        'No string-based setTimeout/setInterval',
-        'Limited innerHTML usage',
-        'No dynamic script loading'
+        "No dynamic code execution (eval, Function constructor)",
+        "No string-based setTimeout/setInterval",
+        "Limited innerHTML usage",
+        "No dynamic script loading",
       ],
       alternatives: [
-        'Use UserScripts API for script execution',
-        'Use chrome.scripting API with static functions',
-        'Use Trusted Types for safe content handling',
-        'Use CSP nonces for script validation'
-      ]
+        "Use UserScripts API for script execution",
+        "Use chrome.scripting API with static functions",
+        "Use Trusted Types for safe content handling",
+        "Use CSP nonces for script validation",
+      ],
     };
   }
 }

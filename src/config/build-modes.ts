@@ -23,65 +23,55 @@ export interface BuildMode {
  */
 export const BUILD_MODES: Record<string, BuildMode> = {
   store: {
-    name: 'Store Compliant',
-    description: '完全符合 Chrome Web Store 规范的版本',
+    name: "Store Compliant",
+    description: "完全符合 Chrome Web Store 规范的版本",
     features: {
       userScriptsAPI: true,
       legacyInjection: false,
       dynamicCodeExecution: false,
       strictCSP: true,
-      evalFallback: false
+      evalFallback: false,
     },
-    permissions: [
-      'activeTab',
-      'storage', 
-      'scripting',
-      'tabs',
-      'userScripts'
-    ],
+    permissions: ["activeTab", "storage", "scripting", "tabs", "userScripts"],
     storeCompliant: true,
-    minimumChromeVersion: '120'
+    minimumChromeVersion: "120",
   },
-  
+
   compat: {
-    name: 'Maximum Compatibility',
-    description: '最大兼容性版本，包含所有功能特性',
+    name: "Maximum Compatibility",
+    description: "最大兼容性版本，包含所有功能特性",
     features: {
       userScriptsAPI: true,
       legacyInjection: true,
       dynamicCodeExecution: true,
       strictCSP: true,
-      evalFallback: true
+      evalFallback: true,
     },
-    permissions: [
-      'activeTab',
-      'storage',
-      'scripting', 
-      'tabs',
-      'userScripts'
-    ],
-    storeCompliant: false
-  }
+    permissions: ["activeTab", "storage", "scripting", "tabs", "userScripts"],
+    storeCompliant: false,
+  },
 };
 
 /**
  * 获取当前构建模式
  */
 export function getCurrentBuildMode(): BuildMode {
-  const mode = process.env.BUILD_MODE || 'store';
+  const mode = process.env.BUILD_MODE || "store";
   const buildMode = BUILD_MODES[mode];
-  
+
   if (!buildMode) {
     throw new Error(`Unknown build mode: ${mode}`);
   }
-  
+
   return buildMode;
 }
 
 /**
  * 检查功能是否启用
  */
-export function isFeatureEnabled(feature: keyof BuildMode['features']): boolean {
+export function isFeatureEnabled(
+  feature: keyof BuildMode["features"],
+): boolean {
   const mode = getCurrentBuildMode();
   return mode.features[feature];
 }
@@ -94,6 +84,6 @@ export function getFeatureFlags() {
   return {
     buildMode: mode.name,
     storeCompliant: mode.storeCompliant,
-    ...mode.features
+    ...mode.features,
   };
 }

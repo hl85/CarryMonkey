@@ -11,7 +11,7 @@
     "builds": "tsc -b && vite build --mode store",
     "buildc": "tsc -b && vite build --mode compat",
     "build:both": "pnpm build:store && pnpm build:compat",
-    "check": "eslint . && tsc --noEmit",
+    "check": "eslint . && tsc --noEmit && prettier --check .",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

@@ -3,39 +3,40 @@
  * 提取公共的注入辅助方法，避免代码重复
  */
 
-import type { UserScript } from '../../core/types';
-import { isFeatureEnabled } from '../../config/feature-flags';
-import { CompliantScriptExecutor } from './compliant-executor';
-import { createComponentLogger } from '../logger';
-import { UserNotifier } from '../user-notifier';
+import type { UserScript } from "../../core/types";
+import { isFeatureEnabled } from "../../config/feature-flags";
+import { CompliantScriptExecutor } from "./compliant-executor";
+import { createComponentLogger } from "../logger";
+import { UserNotifier } from "../user-notifier";
 
 // 创建注入工具专用日志器
-const utilsLogger = createComponentLogger('InjectionUtils');
+const utilsLogger = createComponentLogger("InjectionUtils");
 
 export class InjectionUtils {
-
   /**
    * 判断脚本是否需要隔离环境
    * 基于 @grant 权限判断
    */
   static needsIsolation(script: UserScript): boolean {
     const grants = script.meta.grant || [];
-    return grants.length > 0 && !grants.every(g => g === 'none');
+    return grants.length > 0 && !grants.every((g) => g === "none");
   }
 
   /**
    * 转换 @run-at 时机到 Chrome API 格式
    */
-  static convertRunAtTiming(runAt: string): 'document_start' | 'document_end' | 'document_idle' {
+  static convertRunAtTiming(
+    runAt: string,
+  ): "document_start" | "document_end" | "document_idle" {
     switch (runAt) {
-      case 'document-start':
-        return 'document_start';
-      case 'document-end':
-        return 'document_end';
-      case 'document-idle':
-        return 'document_idle';
+      case "document-start":
+        return "document_start";
+      case "document-end":
+        return "document_end";
+      case "document-idle":
+        return "document_idle";
       default:
-        return 'document_end';
+        return "document_end";
     }
   }
 
@@ -46,16 +47,18 @@ export class InjectionUtils {
     // 设置当前脚本 ID
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
-      func: (id: string) => { window.currentScriptId = id; },
+      func: (id: string) => {
+        window.currentScriptId = id;
+      },
       args: [scriptId],
-      world: 'ISOLATED',
+      world: "ISOLATED",
     });
 
     // 注入 API Bridge
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
-      files: ['src/content-scripts/api-bridge.js'],
-      world: 'ISOLATED',
+      files: ["src/content-scripts/api-bridge.js"],
+      world: "ISOLATED",
     });
   }
 
@@ -65,15 +68,18 @@ export class InjectionUtils {
    */
   static getScriptExecutor() {
     // 检查是否为严格合规模式
-    if (isFeatureEnabled('storeCompliant') && !isFeatureEnabled('dynamicCodeExecution')) {
+    if (
+      isFeatureEnabled("storeCompliant") &&
+      !isFeatureEnabled("dynamicCodeExecution")
+    ) {
       return CompliantScriptExecutor.createCompliantExecutor();
     }
-    
+
     // 检查是否启用动态代码执行
-    if (isFeatureEnabled('dynamicCodeExecution')) {
+    if (isFeatureEnabled("dynamicCodeExecution")) {
       return this.createEnhancedScriptExecutor();
     }
-    
+
     // 默认使用基础执行器（仍包含 Function 构造器，用于兼容模式）
     return this.createBaseScriptExecutor();
   }
@@ -84,28 +90,38 @@ export class InjectionUtils {
    */
   static createBaseScriptExecutor() {
     // 记录执行器创建
-    utilsLogger.debug('Creating base script executor', {
-      type: 'base',
-      compliance: 'legacy',
-      features: ['function-constructor']
+    utilsLogger.debug("Creating base script executor", {
+      type: "base",
+      compliance: "legacy",
+      features: ["function-constructor"],
     });
-    
-    return function(scriptContent: string, scriptName: string) {
+
+    return function (scriptContent: string, scriptName: string) {
       // Note: This warning is embedded in the injected script
-      console.warn(`🐒[CarryMonkey] Using legacy Function constructor for: ${scriptName}`);
+      console.warn(
+        `🐒[CarryMonkey] Using legacy Function constructor for: ${scriptName}`,
+      );
       try {
         // 警告：这违反了严格的 MV3 合规性，仅用于兼容模式
-        const scriptFunction = new Function('window', 'document', 'console', `
+        const scriptFunction = new Function(
+          "window",
+          "document",
+          "console",
+          `
           'use strict';
           ${scriptContent}
-        `);
-        
+        `,
+        );
+
         scriptFunction.call(window, window, document, console);
         // Note: This log is embedded in the injected script
         console.log(`🐒[CarryMonkey] Script executed: ${scriptName}`);
       } catch (error) {
         // Note: This error is embedded in the injected script
-        console.error(`🐒[CarryMonkey] Script execution failed: ${scriptName}`, error);
+        console.error(
+          `🐒[CarryMonkey] Script execution failed: ${scriptName}`,
+          error,
+        );
       }
     };
   }
@@ -116,57 +132,70 @@ export class InjectionUtils {
    */
   static createEnhancedScriptExecutor() {
     // 记录执行器创建
-    utilsLogger.debug('Creating enhanced script executor', {
-      type: 'enhanced',
-      compliance: 'legacy',
-      features: ['script-tag', 'function-constructor', 'eval-fallback']
+    utilsLogger.debug("Creating enhanced script executor", {
+      type: "enhanced",
+      compliance: "legacy",
+      features: ["script-tag", "function-constructor", "eval-fallback"],
     });
-    
-    return function(scriptContent: string, scriptName: string) {
+
+    return function (scriptContent: string, scriptName: string) {
       // Note: This log is embedded in the injected script
       console.log(`🐒[CarryMonkey Enhanced] Executing script: ${scriptName}`);
 
       // 方法1: 尝试 script 标签注入
       if (tryScriptTagInjection(scriptContent)) {
         // Note: This log is embedded in the injected script
-        console.log(`🐒[CarryMonkey Enhanced] Script tag injection successful: ${scriptName}`);
+        console.log(
+          `🐒[CarryMonkey Enhanced] Script tag injection successful: ${scriptName}`,
+        );
         return;
       }
 
       // 方法2: 尝试 Function 构造器
       if (tryFunctionConstructor(scriptContent)) {
         // Note: This log is embedded in the injected script
-        console.log(`🐒[CarryMonkey Enhanced] Function constructor successful: ${scriptName}`);
+        console.log(
+          `🐒[CarryMonkey Enhanced] Function constructor successful: ${scriptName}`,
+        );
         return;
       }
 
       // 方法3: eval 降级（最后手段）
       if (tryEvalFallback(scriptContent)) {
         // Note: This log is embedded in the injected script
-        console.log(`🐒[CarryMonkey Enhanced] Eval fallback successful: ${scriptName}`);
+        console.log(
+          `🐒[CarryMonkey Enhanced] Eval fallback successful: ${scriptName}`,
+        );
         return;
       }
 
       // Note: This error is embedded in the injected script
-      console.error(`🐒[CarryMonkey Enhanced] All injection methods failed: ${scriptName}`);
+      console.error(
+        `🐒[CarryMonkey Enhanced] All injection methods failed: ${scriptName}`,
+      );
 
       // 内部函数：script 标签注入
       function tryScriptTagInjection(code: string): boolean {
         try {
-          const script = document.createElement('script');
+          const script = document.createElement("script");
           script.textContent = code;
-          
+
           // 支持 CSP nonce
-          const nonce = document.querySelector('script[nonce]')?.getAttribute('nonce');
+          const nonce = document
+            .querySelector("script[nonce]")
+            ?.getAttribute("nonce");
           if (nonce) {
-            script.setAttribute('nonce', nonce);
+            script.setAttribute("nonce", nonce);
           }
 
           // 支持 Trusted Types
           if (window.trustedTypes && window.trustedTypes.createPolicy) {
-            const policy = window.trustedTypes.createPolicy('carrymonkey-injection', {
-              createScript: (input: string) => input
-            });
+            const policy = window.trustedTypes.createPolicy(
+              "carrymonkey-injection",
+              {
+                createScript: (input: string) => input,
+              },
+            );
             script.textContent = policy.createScript(code) as string;
           }
 
@@ -174,8 +203,11 @@ export class InjectionUtils {
           script.remove();
           return true;
         } catch (error) {
-            // Note: This warning is embedded in the injected script
-            console.warn('🐒[CarryMonkey Enhanced] Script tag injection failed:', error);
+          // Note: This warning is embedded in the injected script
+          console.warn(
+            "🐒[CarryMonkey Enhanced] Script tag injection failed:",
+            error,
+          );
           return false;
         }
       }
@@ -183,15 +215,23 @@ export class InjectionUtils {
       // 内部函数：Function 构造器
       function tryFunctionConstructor(code: string): boolean {
         try {
-          const scriptFunction = new Function('window', 'document', 'console', `
+          const scriptFunction = new Function(
+            "window",
+            "document",
+            "console",
+            `
             'use strict';
             ${code}
-          `);
+          `,
+          );
           scriptFunction.call(window, window, document, console);
           return true;
         } catch (error) {
-            // Note: This warning is embedded in the injected script
-            console.warn('🐒[CarryMonkey Enhanced] Function constructor failed:', error);
+          // Note: This warning is embedded in the injected script
+          console.warn(
+            "🐒[CarryMonkey Enhanced] Function constructor failed:",
+            error,
+          );
           return false;
         }
       }
@@ -205,8 +245,11 @@ export class InjectionUtils {
           func();
           return true;
         } catch (error) {
-            // Note: This error is embedded in the injected script
-            console.error('🐒[CarryMonkey Enhanced] Function fallback failed:', error);
+          // Note: This error is embedded in the injected script
+          console.error(
+            "🐒[CarryMonkey Enhanced] Function fallback failed:",
+            error,
+          );
           return false;
         }
       }
@@ -214,7 +257,10 @@ export class InjectionUtils {
   }
 
   // 缓存 API 可用性结果，避免重复检查
-  private static userScriptsAPICache: { available: boolean; timestamp: number } | null = null;
+  private static userScriptsAPICache: {
+    available: boolean;
+    timestamp: number;
+  } | null = null;
   private static readonly CACHE_DURATION = 30000; // 30秒缓存
 
   /**
@@ -223,65 +269,70 @@ export class InjectionUtils {
    */
   static async canUseUserScriptsAPI(): Promise<boolean> {
     const startTime = performance.now();
-    
+
     // 阶段0: 检查缓存
     const now = Date.now();
-    if (this.userScriptsAPICache && (now - this.userScriptsAPICache.timestamp) < this.CACHE_DURATION) {
-      utilsLogger.debug('UserScripts API cache hit', {
+    if (
+      this.userScriptsAPICache &&
+      now - this.userScriptsAPICache.timestamp < this.CACHE_DURATION
+    ) {
+      utilsLogger.debug("UserScripts API cache hit", {
         available: this.userScriptsAPICache.available,
         cacheAge: now - this.userScriptsAPICache.timestamp,
-        phase: 'cached'
+        phase: "cached",
       });
       return this.userScriptsAPICache.available;
     }
-    
+
     // 阶段1: 立即检查
     let available = await this.checkUserScriptsAPIInternal();
-    
-    utilsLogger.debug('UserScripts API immediate check', {
+
+    utilsLogger.debug("UserScripts API immediate check", {
       available,
-      phase: 'immediate'
+      phase: "immediate",
     });
 
     // 阶段2: 如果立即检查失败，进行延迟重试
     if (!available) {
-      utilsLogger.debug('UserScripts API delayed check starting', {
-        reason: 'immediate_check_failed',
-        delay: 150
+      utilsLogger.debug("UserScripts API delayed check starting", {
+        reason: "immediate_check_failed",
+        delay: 150,
       });
-      
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       available = await this.checkUserScriptsAPIInternal();
-      
+
       const duration = performance.now() - startTime;
-      utilsLogger.info('UserScripts API delayed check completed', {
+      utilsLogger.info("UserScripts API delayed check completed", {
         available,
-        phase: 'delayed',
+        phase: "delayed",
         duration: Math.round(duration * 100) / 100,
         success: available,
-        reason: available ? 'api_available_after_delay' : 'api_still_unavailable'
+        reason: available
+          ? "api_available_after_delay"
+          : "api_still_unavailable",
       });
     } else {
       const duration = performance.now() - startTime;
-      utilsLogger.debug('UserScripts API immediate check successful', {
+      utilsLogger.debug("UserScripts API immediate check successful", {
         available: true,
-        phase: 'immediate',
-        duration: Math.round(duration * 100) / 100
+        phase: "immediate",
+        duration: Math.round(duration * 100) / 100,
       });
     }
-    
+
     // 缓存结果
     this.userScriptsAPICache = {
       available,
-      timestamp: now
+      timestamp: now,
     };
-    
-    utilsLogger.debug('UserScripts API result cached', {
+
+    utilsLogger.debug("UserScripts API result cached", {
       available,
-      cacheTimestamp: now
+      cacheTimestamp: now,
     });
-    
+
     return available;
   }
 
@@ -290,7 +341,7 @@ export class InjectionUtils {
    */
   static clearUserScriptsAPICache(): void {
     this.userScriptsAPICache = null;
-    utilsLogger.debug('UserScripts API cache cleared');
+    utilsLogger.debug("UserScripts API cache cleared");
   }
 
   /**
@@ -304,11 +355,11 @@ export class InjectionUtils {
     if (!this.userScriptsAPICache) {
       return { cached: false };
     }
-    
+
     return {
       cached: true,
       cacheAge: Date.now() - this.userScriptsAPICache.timestamp,
-      available: this.userScriptsAPICache.available
+      available: this.userScriptsAPICache.available,
     };
   }
 
@@ -327,13 +378,16 @@ export class InjectionUtils {
   private static async checkUserScriptsAPIInternal(): Promise<boolean> {
     const version = this.getChromeVersion();
     // 注意：检查开发者模式的方式可能不完全可靠，这里仅作为示例
-    const isDeveloperMode = chrome.runtime.getManifest().update_url === undefined;
+    const isDeveloperMode =
+      chrome.runtime.getManifest().update_url === undefined;
 
     // 场景一：低版本浏览器
     if (version > 0 && version < 138) {
       if (!isDeveloperMode) {
-        utilsLogger.warn('Older Chrome requires Developer Mode for User Scripts.');
-        UserNotifier.showTip('请从管理扩展程序页开启开发者模式');
+        utilsLogger.warn(
+          "Older Chrome requires Developer Mode for User Scripts.",
+        );
+        UserNotifier.showTip("请从管理扩展程序页开启开发者模式");
         return false;
       }
     }
@@ -341,11 +395,13 @@ export class InjectionUtils {
     // 场景二：高版本浏览器，或已启用开发者模式的低版本浏览器
     try {
       await chrome.userScripts.getScripts();
-      utilsLogger.debug('UserScripts API is available.');
+      utilsLogger.debug("UserScripts API is available.");
       return true;
     } catch (error) {
-      utilsLogger.warn('UserScripts API not available, likely needs permission.' + error);
-      UserNotifier.showTip('请从CarryMonkey详情页开启用户脚本权限');
+      utilsLogger.warn(
+        "UserScripts API not available, likely needs permission." + error,
+      );
+      UserNotifier.showTip("请从CarryMonkey详情页开启用户脚本权限");
       return false;
     }
   }
@@ -354,14 +410,16 @@ export class InjectionUtils {
    * 获取世界类型字符串
    */
   static getWorldString(isolated: boolean): chrome.scripting.ExecutionWorld {
-    const world = isolated ? 'ISOLATED' as chrome.scripting.ExecutionWorld : 'MAIN' as chrome.scripting.ExecutionWorld;
-    
-    utilsLogger.debug('Execution world determined', {
+    const world = isolated
+      ? ("ISOLATED" as chrome.scripting.ExecutionWorld)
+      : ("MAIN" as chrome.scripting.ExecutionWorld);
+
+    utilsLogger.debug("Execution world determined", {
       isolated,
       world,
-      reason: isolated ? 'script-requires-isolation' : 'simple-script'
+      reason: isolated ? "script-requires-isolation" : "simple-script",
     });
-    
+
     return world;
   }
 
@@ -370,20 +428,20 @@ export class InjectionUtils {
    * 根据构建模式选择合适的执行方式
    */
   static async executeScriptContent(
-    scriptContent: string, 
-    scriptName: string, 
+    scriptContent: string,
+    scriptName: string,
     tabId: number,
-    world: chrome.scripting.ExecutionWorld = 'MAIN' as chrome.scripting.ExecutionWorld
+    world: chrome.scripting.ExecutionWorld = "MAIN" as chrome.scripting.ExecutionWorld,
   ): Promise<boolean> {
     const startTime = performance.now();
-    
-    utilsLogger.debug('Executing script content', {
+
+    utilsLogger.debug("Executing script content", {
       scriptName,
       tabId,
       world,
-      contentLength: scriptContent.length
+      contentLength: scriptContent.length,
     });
-    
+
     try {
       await chrome.scripting.executeScript({
         target: { tabId, allFrames: true },
@@ -391,24 +449,24 @@ export class InjectionUtils {
         args: [scriptContent, scriptName],
         world,
       });
-      
+
       const duration = performance.now() - startTime;
-      utilsLogger.info('Script execution successful', {
+      utilsLogger.info("Script execution successful", {
         scriptName,
         tabId,
         world,
-        duration: Math.round(duration * 100) / 100
+        duration: Math.round(duration * 100) / 100,
       });
-      
+
       return true;
     } catch (error) {
       const duration = performance.now() - startTime;
-      utilsLogger.error('Script execution failed', {
+      utilsLogger.error("Script execution failed", {
         scriptName,
         tabId,
         world,
         error: (error as Error).message,
-        duration: Math.round(duration * 100) / 100
+        duration: Math.round(duration * 100) / 100,
       });
       return false;
     }
@@ -417,35 +475,38 @@ export class InjectionUtils {
   /**
    * 验证脚本是否适合当前构建模式
    */
-  static validateScriptForCurrentMode(script: UserScript): { valid: boolean; issues: string[] } {
-    utilsLogger.debug('Validating script for current mode', {
+  static validateScriptForCurrentMode(script: UserScript): {
+    valid: boolean;
+    issues: string[];
+  } {
+    utilsLogger.debug("Validating script for current mode", {
       scriptId: script.id,
       scriptName: script.meta.name,
-      storeCompliant: isFeatureEnabled('storeCompliant')
+      storeCompliant: isFeatureEnabled("storeCompliant"),
     });
-    
-    if (isFeatureEnabled('storeCompliant')) {
+
+    if (isFeatureEnabled("storeCompliant")) {
       const validation = CompliantScriptExecutor.validateScriptContent(script);
-      
-      utilsLogger.debug('Script validation result', {
+
+      utilsLogger.debug("Script validation result", {
         scriptId: script.id,
         scriptName: script.meta.name,
         valid: validation.safe,
         issues: validation.issues,
-        mode: 'store-compliant'
+        mode: "store-compliant",
       });
-      
+
       return { valid: validation.safe, issues: validation.issues };
     }
-    
+
     // 兼容模式下允许所有脚本
-    utilsLogger.debug('Script validation skipped', {
+    utilsLogger.debug("Script validation skipped", {
       scriptId: script.id,
       scriptName: script.meta.name,
-      mode: 'compatibility',
-      reason: 'all-scripts-allowed'
+      mode: "compatibility",
+      reason: "all-scripts-allowed",
     });
-    
+
     return { valid: true, issues: [] };
   }
 }

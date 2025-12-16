@@ -3,7 +3,7 @@
  * 运行时功能控制
  */
 
-import { getCurrentBuildMode } from './build-modes';
+import { getCurrentBuildMode } from "./build-modes";
 
 /**
  * 功能标志类型
@@ -15,7 +15,7 @@ export interface FeatureFlags {
   dynamicCodeExecution: boolean;
   strictCSP: boolean;
   evalFallback: boolean;
-  
+
   // 构建信息
   buildMode: string;
   storeCompliant: boolean;
@@ -27,7 +27,7 @@ export interface FeatureFlags {
  */
 export function getFeatureFlags(): FeatureFlags {
   const mode = getCurrentBuildMode();
-  
+
   return {
     // 功能特性
     userScriptsAPI: mode.features.userScriptsAPI,
@@ -35,11 +35,11 @@ export function getFeatureFlags(): FeatureFlags {
     dynamicCodeExecution: mode.features.dynamicCodeExecution,
     strictCSP: mode.features.strictCSP,
     evalFallback: mode.features.evalFallback,
-    
+
     // 构建信息
     buildMode: mode.name,
     storeCompliant: mode.storeCompliant,
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || "1.0.0",
   };
 }
 
@@ -57,13 +57,13 @@ export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
 export function getDebugInfo() {
   const flags = getFeatureFlags();
   const mode = getCurrentBuildMode();
-  
+
   return {
     buildMode: flags.buildMode,
     storeCompliant: flags.storeCompliant,
     permissions: mode.permissions,
     features: mode.features,
     minimumChromeVersion: mode.minimumChromeVersion,
-    buildTime: new Date().toISOString()
+    buildTime: new Date().toISOString(),
   };
 }

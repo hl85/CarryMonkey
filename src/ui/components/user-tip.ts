@@ -2,7 +2,11 @@
  * 用户提示 UI 组件
  * 在 popup 和 dashboard 中显示来自 storage 的、会自动消失的提示
  */
-import { USER_TIP_KEY, TIP_EXPIRATION_MS, type UserTip } from '../../services/user-notifier';
+import {
+  USER_TIP_KEY,
+  TIP_EXPIRATION_MS,
+  type UserTip,
+} from "../../services/user-notifier";
 
 export class UserTipUI {
   private static tipContainer: HTMLElement | null = null;
@@ -13,8 +17,8 @@ export class UserTipUI {
    */
   static init(): void {
     // 确保在 document available 时才创建 DOM
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.setup());
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => this.setup());
     } else {
       this.setup();
     }
@@ -30,13 +34,13 @@ export class UserTipUI {
    * 创建提示消息容器
    */
   private static createTipContainer(): void {
-    if (document.getElementById('carrymonkey-tip-container')) {
-      this.tipContainer = document.getElementById('carrymonkey-tip-container');
+    if (document.getElementById("carrymonkey-tip-container")) {
+      this.tipContainer = document.getElementById("carrymonkey-tip-container");
       return;
-    };
+    }
 
-    const container = document.createElement('div');
-    container.id = 'carrymonkey-tip-container';
+    const container = document.createElement("div");
+    container.id = "carrymonkey-tip-container";
     container.style.cssText = `
       position: fixed;
       top: 0;
@@ -55,7 +59,7 @@ export class UserTipUI {
    */
   private static listenForTips(): void {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local' && changes[USER_TIP_KEY]) {
+      if (areaName === "local" && changes[USER_TIP_KEY]) {
         const newTip = changes[USER_TIP_KEY].newValue as UserTip | undefined;
         if (newTip) {
           this.showTip(newTip);
@@ -91,11 +95,11 @@ export class UserTipUI {
 
     // 清理可能存在的旧提示
     if (this.tipContainer!.firstChild) {
-      this.tipContainer!.innerHTML = '';
+      this.tipContainer!.innerHTML = "";
     }
 
-    const tipElement = document.createElement('div');
-    tipElement.className = 'carrymonkey-tip';
+    const tipElement = document.createElement("div");
+    tipElement.className = "carrymonkey-tip";
     tipElement.textContent = tip.message;
     tipElement.style.cssText = `
       background-color: rgba(232, 226, 196, 0.2);
@@ -116,8 +120,8 @@ export class UserTipUI {
     this.tipContainer!.appendChild(tipElement);
 
     setTimeout(() => {
-      tipElement.style.opacity = '1';
-      tipElement.style.transform = 'translateY(0)';
+      tipElement.style.opacity = "1";
+      tipElement.style.transform = "translateY(0)";
     }, 50);
 
     const timeSinceCreation = Date.now() - tip.timestamp;
@@ -149,8 +153,8 @@ export class UserTipUI {
     if (immediate) {
       cleanup();
     } else {
-      element.style.opacity = '0';
-      element.style.transform = 'translateY(-100%)';
+      element.style.opacity = "0";
+      element.style.transform = "translateY(-100%)";
       setTimeout(cleanup, 300);
     }
   }

@@ -6,11 +6,11 @@
  * 这里采用GM风格是为兼容性考虑
  */
 
-import type { UserScript } from '../core/types';
-import { createComponentLogger } from './logger';
+import type { UserScript } from "../core/types";
+import { createComponentLogger } from "./logger";
 
 // 创建 GM API 专用日志器
-const apiLogger = createComponentLogger('GMAPIManager');
+const apiLogger = createComponentLogger("GMAPIManager");
 
 export interface GMAPIPayload {
   key?: string;
@@ -27,7 +27,7 @@ export interface GMAPIPayload {
 }
 
 export interface GMAPIResponse {
-  status: 'success' | 'error';
+  status: "success" | "error";
   data?: unknown;
   error?: string;
 }
@@ -51,73 +51,87 @@ export class GMAPIManager {
   /**
    * 处理 GM API 调用
    */
-  async handleAPICall(action: string, payload: GMAPIPayload): Promise<GMAPIResponse> {
+  async handleAPICall(
+    action: string,
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const startTime = performance.now();
-    
+
     try {
       apiLogger.debug(`API call received: ${action}`, { action, payload });
-      
+
       let result: GMAPIResponse;
-      
+
       switch (action) {
-        case 'GM_setValue':
+        case "GM_setValue":
           result = await this.handleGMSetValue(payload);
           break;
-        case 'GM_getValue':
+        case "GM_getValue":
           result = await this.handleGMGetValue(payload);
           break;
-        case 'GM_getResourceText':
+        case "GM_getResourceText":
           result = await this.handleGMGetResourceText(payload);
           break;
-        case 'GM_getResourceURL':
+        case "GM_getResourceURL":
           result = await this.handleGMGetResourceURL(payload);
           break;
-        case 'GM_xmlhttpRequest':
+        case "GM_xmlhttpRequest":
           result = await this.handleGMXMLHttpRequest(payload);
           break;
         default:
-          result = { status: 'error', error: `Unknown GM API: ${action}` };
-          apiLogger.warn(`Unknown GM API called: ${action}`, { action, payload });
+          result = { status: "error", error: `Unknown GM API: ${action}` };
+          apiLogger.warn(`Unknown GM API called: ${action}`, {
+            action,
+            payload,
+          });
       }
-      
+
       const duration = performance.now() - startTime;
-      apiLogger.debug(`API call completed: ${action}`, { 
-        action, 
-        status: result.status, 
-        duration: Math.round(duration * 100) / 100 
+      apiLogger.debug(`API call completed: ${action}`, {
+        action,
+        status: result.status,
+        duration: Math.round(duration * 100) / 100,
       });
-      
+
       return result;
     } catch (error) {
       const duration = performance.now() - startTime;
       const errorMessage = (error as Error).message;
-      
-      apiLogger.error(`API call failed: ${action}`, { 
-        action, 
-        error: errorMessage, 
-        duration: Math.round(duration * 100) / 100 
+
+      apiLogger.error(`API call failed: ${action}`, {
+        action,
+        error: errorMessage,
+        duration: Math.round(duration * 100) / 100,
       });
-      
-      return { status: 'error', error: errorMessage };
+
+      return { status: "error", error: errorMessage };
     }
   }
 
   /**
    * GM_setValue 实现
    */
-  private async handleGMSetValue(payload: GMAPIPayload): Promise<GMAPIResponse> {
+  private async handleGMSetValue(
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const { key, value } = payload;
     if (!key) {
-      apiLogger.warn('GM_setValue called without key parameter', { payload });
-      return { status: 'error', error: 'Missing key parameter' };
+      apiLogger.warn("GM_setValue called without key parameter", { payload });
+      return { status: "error", error: "Missing key parameter" };
     }
 
     try {
       await chrome.storage.local.set({ [key]: value });
-      apiLogger.debug('GM_setValue successful', { key, valueType: typeof value });
-      return { status: 'success' };
+      apiLogger.debug("GM_setValue successful", {
+        key,
+        valueType: typeof value,
+      });
+      return { status: "success" };
     } catch (error) {
-      apiLogger.error('GM_setValue failed', { key, error: (error as Error).message });
+      apiLogger.error("GM_setValue failed", {
+        key,
+        error: (error as Error).message,
+      });
       throw error;
     }
   }
@@ -125,26 +139,31 @@ export class GMAPIManager {
   /**
    * GM_getValue 实现
    */
-  private async handleGMGetValue(payload: GMAPIPayload): Promise<GMAPIResponse> {
+  private async handleGMGetValue(
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const { key, defaultValue } = payload;
     if (!key) {
-      apiLogger.warn('GM_getValue called without key parameter', { payload });
-      return { status: 'error', error: 'Missing key parameter' };
+      apiLogger.warn("GM_getValue called without key parameter", { payload });
+      return { status: "error", error: "Missing key parameter" };
     }
 
     try {
       const result = await chrome.storage.local.get([key]);
       const value = result[key] === undefined ? defaultValue : result[key];
-      
-      apiLogger.debug('GM_getValue successful', { 
-        key, 
+
+      apiLogger.debug("GM_getValue successful", {
+        key,
         hasValue: result[key] !== undefined,
-        usedDefault: result[key] === undefined
+        usedDefault: result[key] === undefined,
       });
-      
-      return { status: 'success', data: value };
+
+      return { status: "success", data: value };
     } catch (error) {
-      apiLogger.error('GM_getValue failed', { key, error: (error as Error).message });
+      apiLogger.error("GM_getValue failed", {
+        key,
+        error: (error as Error).message,
+      });
       throw error;
     }
   }
@@ -152,103 +171,121 @@ export class GMAPIManager {
   /**
    * GM_getResourceText 实现
    */
-  private async handleGMGetResourceText(payload: GMAPIPayload): Promise<GMAPIResponse> {
+  private async handleGMGetResourceText(
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const { scriptId, resourceName } = payload;
     if (!scriptId || !resourceName) {
-      return { status: 'error', error: 'Missing scriptId or resourceName parameter' };
+      return {
+        status: "error",
+        error: "Missing scriptId or resourceName parameter",
+      };
     }
 
     const script = this.getScriptFromCache(scriptId);
     if (!script) {
-      return { status: 'error', error: 'Script not found' };
+      return { status: "error", error: "Script not found" };
     }
 
     const cacheKey = `resource_${script.id}_${resourceName}`;
     const result = await chrome.storage.local.get(cacheKey);
-    
+
     if (result[cacheKey]) {
-      return { status: 'success', data: result[cacheKey] };
+      return { status: "success", data: result[cacheKey] };
     } else {
-      return { status: 'error', error: `Resource not found: ${resourceName}` };
+      return { status: "error", error: `Resource not found: ${resourceName}` };
     }
   }
 
   /**
    * GM_getResourceURL 实现
    */
-  private async handleGMGetResourceURL(payload: GMAPIPayload): Promise<GMAPIResponse> {
+  private async handleGMGetResourceURL(
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const { scriptId, resourceName } = payload;
     if (!scriptId || !resourceName) {
-      return { status: 'error', error: 'Missing scriptId or resourceName parameter' };
+      return {
+        status: "error",
+        error: "Missing scriptId or resourceName parameter",
+      };
     }
 
     const script = this.getScriptFromCache(scriptId);
     if (!script) {
-      return { status: 'error', error: 'Script not found' };
+      return { status: "error", error: "Script not found" };
     }
 
     const cacheKey = `resource_${script.id}_${resourceName}`;
     const result = await chrome.storage.local.get(cacheKey);
-    
+
     if (result[cacheKey]) {
       const blob = new Blob([result[cacheKey] as string]);
       const url = URL.createObjectURL(blob);
-      return { status: 'success', data: url };
+      return { status: "success", data: url };
     } else {
-      return { status: 'error', error: `Resource not found: ${resourceName}` };
+      return { status: "error", error: `Resource not found: ${resourceName}` };
     }
   }
 
   /**
    * GM_xmlhttpRequest 实现
    */
-  private async handleGMXMLHttpRequest(payload: GMAPIPayload): Promise<GMAPIResponse> {
+  private async handleGMXMLHttpRequest(
+    payload: GMAPIPayload,
+  ): Promise<GMAPIResponse> {
     const { scriptId, details } = payload;
     if (!scriptId || !details) {
-      return { status: 'error', error: 'Missing scriptId or details parameter' };
+      return {
+        status: "error",
+        error: "Missing scriptId or details parameter",
+      };
     }
 
     const script = this.getScriptFromCache(scriptId);
     if (!script) {
-      return { status: 'error', error: 'Script not found' };
+      return { status: "error", error: "Script not found" };
     }
 
     const requestUrl = new URL(details.url);
-    const isAllowed = script.meta.connect.some((domain) => 
-      domain === '*' || requestUrl.hostname === domain || requestUrl.hostname.endsWith('.' + domain)
+    const isAllowed = script.meta.connect.some(
+      (domain) =>
+        domain === "*" ||
+        requestUrl.hostname === domain ||
+        requestUrl.hostname.endsWith("." + domain),
     );
 
     if (!isAllowed) {
-      return { 
-        status: 'error', 
-        error: `Domain not whitelisted in @connect: ${requestUrl.hostname}` 
+      return {
+        status: "error",
+        error: `Domain not whitelisted in @connect: ${requestUrl.hostname}`,
       };
     }
 
     try {
       const response = await fetch(details.url, {
-        method: details.method || 'GET',
+        method: details.method || "GET",
         headers: details.headers,
         body: details.data,
       });
-      
+
       const responseText = await response.text();
       const responseHeaders = Array.from(response.headers.entries())
         .map(([key, value]) => `${key}: ${value}`)
-        .join('\n');
-      
+        .join("\n");
+
       return {
-        status: 'success',
-        data: { 
-          responseText, 
-          status: response.status, 
-          statusText: response.statusText, 
-          responseHeaders, 
-          finalUrl: response.url 
-        }
+        status: "success",
+        data: {
+          responseText,
+          status: response.status,
+          statusText: response.statusText,
+          responseHeaders,
+          finalUrl: response.url,
+        },
       };
     } catch (error) {
-      return { status: 'error', error: (error as Error).message };
+      return { status: "error", error: (error as Error).message };
     }
   }
 
@@ -281,7 +318,7 @@ export class GMAPIManager {
    * 批量缓存脚本
    */
   cacheScripts(scripts: UserScript[]): void {
-    scripts.forEach(script => {
+    scripts.forEach((script) => {
       this.scriptCache[script.id] = script;
     });
   }

@@ -5,51 +5,51 @@
 
 export const baseManifest = {
   manifest_version: 3,
-  version: '1.0.0',
-  
+  version: "1.0.0",
+
   icons: {
-    '16': 'assets/icon.png',
-    '48': 'assets/icon.png',
-    '128': 'assets/icon.png'
+    "16": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png",
   },
 
   action: {
-    default_popup: 'src/ui/popup/index.html',
-    default_title: 'CarryMonkey'
+    default_popup: "src/ui/popup/index.html",
+    default_title: "CarryMonkey",
   },
-  
-  options_page: 'src/ui/dashboard/index.html',
+
+  options_page: "src/ui/dashboard/index.html",
 
   background: {
-    service_worker: 'src/core/background.ts',
-    type: 'module'
+    service_worker: "src/core/background.ts",
+    type: "module",
   },
 
   content_scripts: [
     {
-      matches: ['<all_urls>'],
-      js: ['src/content-scripts/api-bridge.ts'],
-      run_at: 'document_start',
-      all_frames: true
-    }
+      matches: ["<all_urls>"],
+      js: ["src/content-scripts/api-bridge.ts"],
+      run_at: "document_start",
+      all_frames: true,
+    },
   ],
 
   web_accessible_resources: [
     {
-      resources: ['src/content-scripts/*'],
-      matches: ['<all_urls>']
-    }
+      resources: ["src/content-scripts/*"],
+      matches: ["<all_urls>"],
+    },
   ],
 
-  host_permissions: ['<all_urls>'],
+  host_permissions: ["<all_urls>"],
 
   permissions: [
-    'activeTab',
-    'storage',
-    'unlimitedStorage',
-    'scripting',
-    'tabs',
-    'userScripts',
-    'notifications'  // 添加通知权限
-  ]
+    "activeTab",
+    "storage",
+    "unlimitedStorage",
+    "scripting",
+    "tabs",
+    "userScripts",
+    "notifications", // 添加通知权限
+  ],
 };

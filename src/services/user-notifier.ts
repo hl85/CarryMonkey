@@ -2,16 +2,16 @@
  * 用户提示服务
  * 提供一个简单的、基于存储的通知机制
  */
-import { createComponentLogger } from './logger';
+import { createComponentLogger } from "./logger";
 
-const notifierLogger = createComponentLogger('UserNotifier');
+const notifierLogger = createComponentLogger("UserNotifier");
 
 export interface UserTip {
   message: string;
   timestamp: number;
 }
 
-export const USER_TIP_KEY = 'user_tip';
+export const USER_TIP_KEY = "user_tip";
 export const TIP_EXPIRATION_MS = 20000; // 20秒
 
 export class UserNotifier {
@@ -28,9 +28,9 @@ export class UserNotifier {
 
     try {
       await chrome.storage.local.set({ [USER_TIP_KEY]: tip });
-      notifierLogger.info('User tip has been set in storage', { message });
+      notifierLogger.info("User tip has been set in storage", { message });
     } catch (error) {
-      notifierLogger.error('Failed to set user tip in storage', {
+      notifierLogger.error("Failed to set user tip in storage", {
         error: (error as Error).message,
       });
     }

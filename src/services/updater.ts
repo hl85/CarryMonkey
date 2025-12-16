@@ -1,4 +1,4 @@
-import type { UserScript } from '../core/types';
+import type { UserScript } from "../core/types";
 
 export async function checkForUpdates(script: UserScript): Promise<boolean> {
   if (!script.meta.updateURL) {
@@ -15,13 +15,15 @@ export async function checkForUpdates(script: UserScript): Promise<boolean> {
       return newVersion !== script.meta.version;
     }
   } catch (error) {
-    console.error('Failed to check for updates:', error);
+    console.error("Failed to check for updates:", error);
   }
 
   return false;
 }
 
-export async function applyUpdate(script: UserScript): Promise<UserScript | null> {
+export async function applyUpdate(
+  script: UserScript,
+): Promise<UserScript | null> {
   if (!script.meta.downloadURL) {
     return null;
   }
@@ -38,7 +40,7 @@ export async function applyUpdate(script: UserScript): Promise<UserScript | null
       // You would re-parse the metadata here to get the new version, etc.
     };
   } catch (error) {
-    console.error('Failed to apply update:', error);
+    console.error("Failed to apply update:", error);
   }
 
   return null;

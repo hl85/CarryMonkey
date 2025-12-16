@@ -9,7 +9,7 @@ interface TrustedTypePolicyFactory {
     policyName: string,
     policyOptions: {
       createScript: (input: string) => string;
-    }
+    },
   ): TrustedTypePolicy;
   emptyScript: string;
 }

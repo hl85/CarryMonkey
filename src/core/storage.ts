@@ -1,7 +1,7 @@
-import type { UserScript } from './types';
+import type { UserScript } from "./types";
 
 export const getScripts = async (): Promise<UserScript[]> => {
-  const result = await chrome.storage.local.get('scripts');
+  const result = await chrome.storage.local.get("scripts");
   return (result.scripts as UserScript[]) || [];
 };
 
@@ -17,7 +17,9 @@ export const deleteScripts = async (idsToDelete: string[]): Promise<void> => {
   await chrome.storage.local.set({ scripts: remainingScripts });
 };
 
-export const updateScript = async (updatedScript: UserScript): Promise<void> => {
+export const updateScript = async (
+  updatedScript: UserScript,
+): Promise<void> => {
   const scripts = await getScripts();
   const scriptIndex = scripts.findIndex((s) => s.id === updatedScript.id);
   if (scriptIndex > -1) {

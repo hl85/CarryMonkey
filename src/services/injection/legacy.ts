@@ -4,13 +4,13 @@
  * 注意：此模块不符合 Chrome Web Store 规范，仅用于兼容性版本
  */
 
-import type { UserScript } from '../../core/types';
-import { CompliantInjectionStrategy } from './compliant';
-import { InjectionUtils } from './utils';
-import { createComponentLogger } from '../logger';
+import type { UserScript } from "../../core/types";
+import { CompliantInjectionStrategy } from "./compliant";
+import { InjectionUtils } from "./utils";
+import { createComponentLogger } from "../logger";
 
 // 创建兼容性注入策略专用日志器
-const legacyLogger = createComponentLogger('CompatibilityInjection');
+const legacyLogger = createComponentLogger("CompatibilityInjection");
 
 export class CompatibilityInjectionStrategy {
   /**
@@ -18,42 +18,42 @@ export class CompatibilityInjectionStrategy {
    */
   static async inject(script: UserScript, tabId: number): Promise<void> {
     const startTime = performance.now();
-    
-    legacyLogger.info('Starting compatibility injection', {
+
+    legacyLogger.info("Starting compatibility injection", {
       scriptId: script.id,
       scriptName: script.meta.name,
       tabId,
-      action: 'compatibility-injection-start'
+      action: "compatibility-injection-start",
     });
-    
+
     try {
       // 首先尝试合规策略
       await CompliantInjectionStrategy.inject(script, tabId);
-      
+
       const duration = performance.now() - startTime;
-      legacyLogger.info('Compliant injection succeeded', {
+      legacyLogger.info("Compliant injection succeeded", {
         scriptId: script.id,
         scriptName: script.meta.name,
         duration: Math.round(duration * 100) / 100,
-        fallback: false
+        fallback: false,
       });
     } catch (error) {
-      legacyLogger.warn('Compliant injection failed, using legacy fallback', {
+      legacyLogger.warn("Compliant injection failed, using legacy fallback", {
         scriptId: script.id,
         scriptName: script.meta.name,
         error: (error as Error).message,
-        fallback: true
+        fallback: true,
       });
-      
+
       // 降级到传统注入方法
       await this.injectWithLegacyMethods(script, tabId);
-      
+
       const duration = performance.now() - startTime;
-      legacyLogger.info('Legacy fallback injection completed', {
+      legacyLogger.info("Legacy fallback injection completed", {
         scriptId: script.id,
         scriptName: script.meta.name,
         duration: Math.round(duration * 100) / 100,
-        fallback: true
+        fallback: true,
       });
     }
   }
@@ -61,13 +61,16 @@ export class CompatibilityInjectionStrategy {
   /**
    * 传统注入方法（包含 eval 等非合规功能）
    */
-  private static async injectWithLegacyMethods(script: UserScript, tabId: number): Promise<void> {
-    legacyLogger.warn('Using legacy injection methods', {
+  private static async injectWithLegacyMethods(
+    script: UserScript,
+    tabId: number,
+  ): Promise<void> {
+    legacyLogger.warn("Using legacy injection methods", {
       scriptId: script.id,
       scriptName: script.meta.name,
-      reason: 'compliant-injection-failed'
+      reason: "compliant-injection-failed",
     });
-    
+
     const needsIsolation = InjectionUtils.needsIsolation(script);
     const world = InjectionUtils.getWorldString(needsIsolation);
 
@@ -88,24 +91,29 @@ export class CompatibilityInjectionStrategy {
   /**
    * 获取策略信息
    */
-  static getStrategyInfo(): { name: string; compliant: boolean; features: string[]; warnings?: string[] } {
+  static getStrategyInfo(): {
+    name: string;
+    compliant: boolean;
+    features: string[];
+    warnings?: string[];
+  } {
     return {
-      name: 'Compatibility Injection Strategy',
+      name: "Compatibility Injection Strategy",
       compliant: false,
       features: [
-        'UserScripts API support (with wrappers)',
-        'chrome.scripting API fallback',
-        'Script tag injection with CSP bypass',
-        'Function constructor fallback',
-        'eval() emergency fallback',
-        'Trusted Types support',
-        'CSP nonce support'
+        "UserScripts API support (with wrappers)",
+        "chrome.scripting API fallback",
+        "Script tag injection with CSP bypass",
+        "Function constructor fallback",
+        "eval() emergency fallback",
+        "Trusted Types support",
+        "CSP nonce support",
       ],
       warnings: [
-        'Uses Function constructor (violates MV3 compliance)',
-        'Uses eval() as last resort (violates MV3 compliance)',
-        'Not suitable for Chrome Web Store distribution'
-      ]
+        "Uses Function constructor (violates MV3 compliance)",
+        "Uses eval() as last resort (violates MV3 compliance)",
+        "Not suitable for Chrome Web Store distribution",
+      ],
     };
   }
 }

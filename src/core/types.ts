@@ -20,9 +20,9 @@ export type RunAt =
   | "context-menu";
 
 export interface InjectionStrategy {
-  method: 'content-script' | 'userscripts-api' | 'userscripts-dynamic';
-  world: 'MAIN' | 'USER_SCRIPT';
-  timing: 'document_start' | 'document_end' | 'document_idle';
+  method: "content-script" | "userscripts-api" | "userscripts-dynamic";
+  world: "MAIN" | "USER_SCRIPT";
+  timing: "document_start" | "document_end" | "document_idle";
   reason: string;
 }
 
@@ -50,10 +50,9 @@ export interface UserScript {
     downloadURL: string;
     updateURL: string;
     "run-at": RunAt;
-    sandbox?: 'raw' | 'JavaScript' | 'DOM';
+    sandbox?: "raw" | "JavaScript" | "DOM";
     // 注入策略缓存
     _injectionStrategy?: InjectionStrategy;
   };
   lastUpdated: number;
 }
-

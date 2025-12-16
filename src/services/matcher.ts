@@ -1,7 +1,7 @@
-import { createComponentLogger } from './logger';
+import { createComponentLogger } from "./logger";
 
 // 创建匹配器专用日志器
-const matcherLogger = createComponentLogger('Matcher');
+const matcherLogger = createComponentLogger("Matcher");
 
 /**
  * Converts a match pattern string into a regular expression.
@@ -10,31 +10,33 @@ const matcherLogger = createComponentLogger('Matcher');
  * @returns A RegExp object that can be used to test URLs.
  */
 function patternToRegExp(pattern: string): RegExp {
-  if (pattern === '<all_urls>') {
+  if (pattern === "<all_urls>") {
     return /^(https?|file|ftp|chrome-extension):\/\//;
   }
 
   const schemeMatch = pattern.match(/^(https?|\*):\/\//);
   if (!schemeMatch) {
-    throw new Error(`Invalid match pattern: ${pattern}. Must start with a valid scheme.`);
+    throw new Error(
+      `Invalid match pattern: ${pattern}. Must start with a valid scheme.`,
+    );
   }
 
-  const [scheme, ...rest] = pattern.split('://');
-  const [host, path] = rest.join('://').split('/');
-  
+  const [scheme, ...rest] = pattern.split("://");
+  const [host, path] = rest.join("://").split("/");
+
   // Scheme conversion
-  const schemeRegex = scheme === '*' ? 'https?|ftp' : scheme;
+  const schemeRegex = scheme === "*" ? "https?|ftp" : scheme;
 
   // Host conversion
-  let hostRegex = host.replace(/\./g, '\\.'); // Escape dots
-  if (hostRegex.startsWith('*\\.')) {
+  let hostRegex = host.replace(/\./g, "\\."); // Escape dots
+  if (hostRegex.startsWith("*\\.")) {
     // Subdomain wildcard
     hostRegex = `([^/]+\\.)?${hostRegex.substring(2)}`;
   }
-  hostRegex = hostRegex.replace(/\*/g, '[^/]*'); // Other wildcards
+  hostRegex = hostRegex.replace(/\*/g, "[^/]*"); // Other wildcards
 
   // Path conversion
-  const pathRegex = '/' + (path || '').replace(/\*/g, '.*');
+  const pathRegex = "/" + (path || "").replace(/\*/g, ".*");
 
   return new RegExp(`^${schemeRegex}://${hostRegex}${pathRegex}$`);
 }
@@ -47,15 +49,15 @@ function patternToRegExp(pattern: string): RegExp {
  */
 export function matches(url: string, patterns: string[]): boolean {
   if (!url) return false;
-  return patterns.some(pattern => {
+  return patterns.some((pattern) => {
     try {
       const regex = patternToRegExp(pattern);
       return regex.test(url);
     } catch (e) {
-      matcherLogger.error('Pattern matching failed', {
+      matcherLogger.error("Pattern matching failed", {
         url,
         pattern,
-        error: (e as Error).message
+        error: (e as Error).message,
       });
       return false;
     }

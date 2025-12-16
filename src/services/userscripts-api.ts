@@ -1,31 +1,39 @@
-import type { UserScript, InjectionStrategy } from '../core/types';
-import { createComponentLogger } from './logger';
+import type { UserScript, InjectionStrategy } from "../core/types";
+import { createComponentLogger } from "./logger";
 
 // 创建 UserScripts API 管理器专用日志器
-const userScriptsLogger = createComponentLogger('UserScriptsAPI');
+const userScriptsLogger = createComponentLogger("UserScriptsAPI");
 
 /**
  * UserScripts API 管理器
  * 封装 Chrome UserScripts API 的使用
  */
 export class UserScriptsAPIManager {
-  private static registeredScripts = new Map<string, chrome.userScripts.RegisteredUserScript>();
+  private static registeredScripts = new Map<
+    string,
+    chrome.userScripts.RegisteredUserScript
+  >();
 
   /**
    * 检查 UserScripts API 是否可用
    */
   static isAvailable(): boolean {
-    return typeof chrome !== 'undefined' && 
-           chrome.userScripts !== undefined &&
-           typeof chrome.userScripts.register === 'function';
+    return (
+      typeof chrome !== "undefined" &&
+      chrome.userScripts !== undefined &&
+      typeof chrome.userScripts.register === "function"
+    );
   }
 
   /**
    * 注册脚本到 UserScripts API（兼容模式，使用包装器）
    */
-  static async registerScript(script: UserScript, strategy: InjectionStrategy): Promise<void> {
+  static async registerScript(
+    script: UserScript,
+    strategy: InjectionStrategy,
+  ): Promise<void> {
     if (!this.isAvailable()) {
-      throw new Error('UserScripts API is not available');
+      throw new Error("UserScripts API is not available");
     }
 
     // 先注销已存在的脚本
@@ -34,27 +42,28 @@ export class UserScriptsAPIManager {
     const userScript: chrome.userScripts.RegisteredUserScript = {
       id: script.id,
       matches: script.meta.match || [],
-      js: strategy.method === 'userscripts-dynamic' 
-        ? [{ code: script.content }]
-        : [{ code: this.generateWrapper(script) }],
+      js:
+        strategy.method === "userscripts-dynamic"
+          ? [{ code: script.content }]
+          : [{ code: this.generateWrapper(script) }],
       runAt: strategy.timing,
       world: strategy.world,
-      allFrames: true
+      allFrames: true,
     };
 
     try {
       await chrome.userScripts.register([userScript]);
       this.registeredScripts.set(script.id, userScript);
-      userScriptsLogger.info('Script registered successfully', {
+      userScriptsLogger.info("Script registered successfully", {
         scriptId: script.id,
         scriptName: script.meta.name,
-        method: strategy.method
+        method: strategy.method,
       });
     } catch (error) {
-      userScriptsLogger.error('Failed to register script', {
+      userScriptsLogger.error("Failed to register script", {
         scriptId: script.id,
         scriptName: script.meta.name,
-        error: (error as Error).message
+        error: (error as Error).message,
       });
       throw error;
     }
@@ -63,9 +72,12 @@ export class UserScriptsAPIManager {
   /**
    * 注册脚本到 UserScripts API（合规模式，不使用包装器）
    */
-  static async registerScriptCompliant(script: UserScript, strategy: InjectionStrategy): Promise<void> {
+  static async registerScriptCompliant(
+    script: UserScript,
+    strategy: InjectionStrategy,
+  ): Promise<void> {
     if (!this.isAvailable()) {
-      throw new Error('UserScripts API is not available');
+      throw new Error("UserScripts API is not available");
     }
 
     // 先注销已存在的脚本
@@ -78,23 +90,26 @@ export class UserScriptsAPIManager {
       js: [{ code: script.content }], // 直接使用脚本内容，不包装
       runAt: strategy.timing,
       world: strategy.world,
-      allFrames: true
+      allFrames: true,
     };
 
     try {
       await chrome.userScripts.register([userScript]);
       this.registeredScripts.set(script.id, userScript);
-      userScriptsLogger.info('Script registered successfully (compliant mode)', {
-        scriptId: script.id,
-        scriptName: script.meta.name,
-        mode: 'compliant'
-      });
+      userScriptsLogger.info(
+        "Script registered successfully (compliant mode)",
+        {
+          scriptId: script.id,
+          scriptName: script.meta.name,
+          mode: "compliant",
+        },
+      );
     } catch (error) {
-      userScriptsLogger.error('Failed to register script (compliant mode)', {
+      userScriptsLogger.error("Failed to register script (compliant mode)", {
         scriptId: script.id,
         scriptName: script.meta.name,
-        mode: 'compliant',
-        error: (error as Error).message
+        mode: "compliant",
+        error: (error as Error).message,
       });
       throw error;
     }
@@ -112,14 +127,14 @@ export class UserScriptsAPIManager {
       try {
         await chrome.userScripts.unregister({ ids: [scriptId] });
         this.registeredScripts.delete(scriptId);
-        userScriptsLogger.info('Script unregistered successfully', {
-            scriptId
-          });
-        } catch (error) {
-          userScriptsLogger.error('Failed to unregister script', {
-            scriptId,
-            error: (error as Error).message
-          });
+        userScriptsLogger.info("Script unregistered successfully", {
+          scriptId,
+        });
+      } catch (error) {
+        userScriptsLogger.error("Failed to unregister script", {
+          scriptId,
+          error: (error as Error).message,
+        });
       }
     }
   }
@@ -135,12 +150,12 @@ export class UserScriptsAPIManager {
     try {
       await chrome.userScripts.unregister();
       this.registeredScripts.clear();
-      userScriptsLogger.info('All scripts unregistered successfully', {
-        count: this.registeredScripts.size
+      userScriptsLogger.info("All scripts unregistered successfully", {
+        count: this.registeredScripts.size,
       });
     } catch (error) {
-      userScriptsLogger.error('Failed to unregister all scripts', {
-        error: (error as Error).message
+      userScriptsLogger.error("Failed to unregister all scripts", {
+        error: (error as Error).message,
       });
     }
   }
@@ -157,12 +172,12 @@ export class UserScriptsAPIManager {
    * 警告：此方法使用 Function 构造器，不符合严格的 MV3 合规性
    */
   private static generateWrapper(script: UserScript): string {
-    userScriptsLogger.warn('Using non-compliant wrapper', {
+    userScriptsLogger.warn("Using non-compliant wrapper", {
       scriptId: script.id,
       scriptName: script.meta.name,
-      reason: 'legacy-compatibility'
+      reason: "legacy-compatibility",
     });
-    
+
     return `
       (function() {
         'use strict';
@@ -199,7 +214,7 @@ export class UserScriptsAPIManager {
                     description: '${script.meta.description}',
                     author: '${script.meta.author}'
                   },
-                  scriptMetaStr: \`${JSON.stringify(script.meta).replace(/`/g, '\\`')}\`,
+                  scriptMetaStr: \`${JSON.stringify(script.meta).replace(/`/g, "\\`")}\`,
                   version: '1.0.0',
                   scriptHandler: 'CarryMonkey'
                 }
@@ -214,60 +229,64 @@ export class UserScriptsAPIManager {
     `;
   }
 
-  
-
   /**
    * 更新脚本
    */
-  static async updateScript(script: UserScript, strategy: InjectionStrategy): Promise<void> {
+  static async updateScript(
+    script: UserScript,
+    strategy: InjectionStrategy,
+  ): Promise<void> {
     await this.registerScript(script, strategy);
   }
 
   /**
    * 获取脚本状态
    */
-  static getScriptStatus(scriptId: string): 'registered' | 'not-registered' {
-    return this.registeredScripts.has(scriptId) ? 'registered' : 'not-registered';
+  static getScriptStatus(scriptId: string): "registered" | "not-registered" {
+    return this.registeredScripts.has(scriptId)
+      ? "registered"
+      : "not-registered";
   }
 
   /**
    * 批量注册脚本
    */
   static async registerMultipleScripts(
-    scripts: Array<{ script: UserScript; strategy: InjectionStrategy }>
+    scripts: Array<{ script: UserScript; strategy: InjectionStrategy }>,
   ): Promise<void> {
     if (!this.isAvailable()) {
-      throw new Error('UserScripts API is not available');
+      throw new Error("UserScripts API is not available");
     }
 
     const userScripts: chrome.userScripts.RegisteredUserScript[] = [];
-    
+
     for (const { script, strategy } of scripts) {
       const userScript: chrome.userScripts.RegisteredUserScript = {
         id: script.id,
         matches: script.meta.match || [],
-        js: strategy.method === 'userscripts-dynamic' 
-          ? [{ code: script.content }]
-          : [{ code: this.generateWrapper(script) }],
+        js:
+          strategy.method === "userscripts-dynamic"
+            ? [{ code: script.content }]
+            : [{ code: this.generateWrapper(script) }],
         runAt: strategy.timing,
         world: strategy.world,
-        allFrames: true
+        allFrames: true,
       };
-      
+
       userScripts.push(userScript);
       this.registeredScripts.set(script.id, userScript);
     }
 
     try {
       await chrome.userScripts.register(userScripts);
-      userScriptsLogger.info('Batch registration completed', {
+      userScriptsLogger.info("Batch registration completed", {
         count: userScripts.length,
-        scriptIds: userScripts.map(s => s.id)
+        scriptIds: userScripts.map((s) => s.id),
       });
     } catch (error) {
-      userScriptsLogger.error('Failed to batch register scripts', {
+      userScriptsLogger.error("Failed to batch register scripts", {
         count: userScripts.length,
-        error: (error as Error).message
+        error: (error as Error).message,
       });
       throw error;
     }
