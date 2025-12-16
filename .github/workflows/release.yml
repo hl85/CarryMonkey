@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
   build-and-release:
     name: Build and Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,8 +25,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'pnpm'
+          node-version: "18"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -66,20 +66,20 @@ jobs:
           generate_release_notes: true
           body: |
             ## 📦 下载说明
-            
+
             - **carrymonkey-store-${{ github.ref_name }}.zip**: Chrome Web Store 商店版（推荐）
               - ✅ 完全符合 Chrome Web Store 规范
               - ✅ 适合商店发布和企业环境
               - ✅ 最高安全性
-            
+
             - **carrymonkey-compat-${{ github.ref_name }}.zip**: 兼容版
               - ✅ 完整 GM API 支持
               - ✅ 支持动态代码执行
               - ⚠️ 不适合商店提交
               - 适合开发测试和高级用户
-            
+
             ## 🚀 安装方法
-            
+
             1. 下载对应版本的 zip 文件
             2. 解压到本地目录
             3. 打开 Chrome，访问 `chrome://extensions`
