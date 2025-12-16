@@ -13,6 +13,24 @@ import { GuidanceEventBus } from '../guidance-events';
 const utilsLogger = createComponentLogger('InjectionUtils');
 
 export class InjectionUtils {
+  private static initialized = false;
+
+  /**
+   * 初始化注入工具类
+   * 设置事件监听器
+   */
+  static init(): void {
+    if (this.initialized) return;
+
+    GuidanceEventBus.on('clear_userscripts_cache', () => {
+      this.clearUserScriptsAPICache();
+      utilsLogger.debug('UserScripts API cache cleared via event');
+    });
+
+    this.initialized = true;
+    utilsLogger.debug('Injection utils service initialized');
+  }
+
   /**
    * 判断脚本是否需要隔离环境
    * 基于 @grant 权限判断
@@ -312,98 +330,46 @@ export class InjectionUtils {
   }
 
   /**
-   * 内部多层次检测方法
+   * 从 User-Agent 中解析 Chrome 版本号
+   */
+  private static getChromeVersion(): number {
+    const userAgent = navigator.userAgent;
+    const match = userAgent.match(/(Chrome|Chromium)\/([0-9]+)/);
+    return match ? Number(match[2]) : 0;
+  }
+
+  /**
+   * 内部检测方法，根据用户指定的逻辑实现
    */
   private static async checkUserScriptsAPIInternal(): Promise<boolean> {
+    const version = this.getChromeVersion();
+    const isDeveloperMode = chrome.runtime.getManifest().short_name?.includes('Dev');
+
+    // 场景一：低版本浏览器
+    if (version < 138) {
+      if (!isDeveloperMode) {
+        utilsLogger.warn('UserScripts API check failed on older Chrome without Developer Mode.', {
+          version,
+          isDeveloperMode
+        });
+        GuidanceEventBus.emit('browser_compatibility', { reason: 'developer_mode_required' });
+        return false;
+      }
+      // 对于低版本 + 开发者模式，继续尝试 API 调用
+    }
+
+    // 场景二：高版本浏览器，或已启用开发者模式的低版本浏览器
     try {
-      // 层次1: 基础对象检测 (类似篡改猴的检测方式)
-      const hasUserScriptsObject = !!chrome?.userScripts;
-      
-      if (!hasUserScriptsObject) {
-        utilsLogger.warn('UserScripts object missing', {
-          reason: 'userScripts_object_missing',
-          suggestion: 'Browser may not support UserScripts API'
-        });
-        
-        // 通过事件总线触发用户指导，避免循环依赖
-        GuidanceEventBus.emit('userscripts_unavailable', { reason: 'userScripts_object_missing' });
-        
-        return false;
-      }
-      
-      // 层次2: 权限检测
-      let hasPermission = false;
-      try {
-        hasPermission = await chrome.permissions.contains({
-          permissions: ['userScripts']
-        });
-        
-        if (!hasPermission) {
-          utilsLogger.warn('UserScripts permission denied', {
-            reason: 'permission_denied',
-            suggestion: 'User guidance will be shown'
-          });
-          
-          // 通过事件总线触发用户指导，避免循环依赖
-          GuidanceEventBus.emit('userscripts_permission_denied');
-          
-          return false;
-        }
-      } catch (permissionError) {
-        // 继续检查，可能是旧版本 Chrome 不支持 permissions.contains
-        utilsLogger.debug('Permission check failed, continuing', {
-          error: (permissionError as Error).message
-        });
-      }
-      
-      // 层次3: 方法可用性检测
-      const hasRegisterMethod = typeof chrome.userScripts.register === 'function';
-      
-      if (!hasRegisterMethod) {
-        utilsLogger.warn('UserScripts register method missing', {
-          reason: 'register_method_missing',
-          suggestion: 'API object exists but methods are missing'
-        });
-        
-        // 通过事件总线触发用户指导，避免循环依赖
-        GuidanceEventBus.emit('userscripts_unavailable', { reason: 'register_method_missing' });
-        
-        return false;
-      }
-      
-      // 层次4: 实际功能测试 (轻量级)
-      try {
-        await chrome.userScripts.getScripts();
-        
-        utilsLogger.debug('UserScripts API functional test passed', {
-          checks: {
-            objectExists: true,
-            hasPermission: hasPermission || 'unknown',
-            hasRegisterMethod: true,
-            functionalTest: true
-          }
-        });
-        
-        return true;
-      } catch (functionalError) {
-        utilsLogger.warn('UserScripts functional test failed', {
-          error: (functionalError as Error).message,
-          reason: 'functional_test_failed',
-          suggestion: 'API exists but cannot be used'
-        });
-        
-        // 通过事件总线触发用户指导，避免循环依赖
-        GuidanceEventBus.emit('userscripts_unavailable', { reason: 'functional_test_failed' });
-        
-        return false;
-      }
-      
+      await chrome.userScripts.getScripts();
+      utilsLogger.debug('UserScripts API is available.');
+      return true;
     } catch (error) {
-      utilsLogger.debug('UserScripts API check exception', {
-        error: (error as Error).message,
-        reason: 'check_exception'
+      utilsLogger.warn('UserScripts API is not available, likely needs to be enabled in extension details.', {
+        version,
+        isDeveloperMode,
+        error: (error as Error).message
       });
-      
+      GuidanceEventBus.emit('userscripts_permission_denied');
       return false;
     }
   }

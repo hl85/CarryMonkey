@@ -25,6 +25,11 @@ export interface GuidanceAction {
   primary?: boolean;
 }
 
+export interface StoredGuidanceMessage extends GuidanceMessage {
+  timestamp: number;
+  id: string;
+}
+
 export class UserGuidanceService {
   private static guidanceQueue: GuidanceMessage[] = [];
   private static isShowing = false;
@@ -42,25 +47,13 @@ export class UserGuidanceService {
     });
 
     GuidanceEventBus.on('userscripts_unavailable', (event) => {
-      const reason = event.data?.reason || 'unknown';
+      const reason = String(event.data?.reason || 'unknown');
       this.addUserScriptsUnavailableGuidance(reason);
     });
 
-    GuidanceEventBus.on('browser_compatibility', () => {
-      this.addBrowserCompatibilityGuidance();
-    });
-
-    // 监听缓存清除事件
-    GuidanceEventBus.on('clear_userscripts_cache', async () => {
-      try {
-        const { InjectionUtils } = await import('./injection/utils');
-        InjectionUtils.clearUserScriptsAPICache();
-        guidanceLogger.debug('UserScripts API cache cleared via event');
-      } catch (error) {
-        guidanceLogger.error('Failed to clear UserScripts API cache', {
-          error: (error as Error).message
-        });
-      }
+    GuidanceEventBus.on('browser_compatibility', (event) => {
+      const reason = String(event.data?.reason || 'unknown');
+      this.addBrowserCompatibilityGuidance(reason);
     });
 
     this.initialized = true;
@@ -90,22 +83,20 @@ export class UserGuidanceService {
    * UserScripts 权限缺失指导
    */
   static addUserScriptsPermissionGuidance(): void {
+    const extensionId = chrome.runtime.id;
+    const detailsUrl = `chrome://extensions/?id=${extensionId}`;
+
     const guidance: GuidanceMessage = {
       type: 'permission',
       severity: 'warning',
-      title: 'UserScripts 权限未启用',
-      message: 'CarryMonkey 需要 UserScripts 权限来提供最佳的脚本注入体验。当前将使用兼容模式，可能影响某些功能。',
+      title: '请启用用户脚本权限',
+      message: '为了让 CarryMonkey 正常运行所有脚本，您需要手动启用“允许用户脚本”权限。',
       actions: [
         {
-          label: '启用权限',
-          type: 'button',
-          action: 'enable_userscripts_permission',
+          label: '前往设置页面',
+          type: 'link', // 将由 background.ts 处理
+          action: detailsUrl,
           primary: true
-        },
-        {
-          label: '了解更多',
-          type: 'link',
-          action: 'https://developer.chrome.com/docs/extensions/reference/userScripts/'
         },
         {
           label: '暂时忽略',
@@ -113,7 +104,7 @@ export class UserGuidanceService {
           action: 'dismiss'
         }
       ],
-      learnMoreUrl: 'https://github.com/your-repo/carrymonkey/wiki/userscripts-permission'
+      learnMoreUrl: 'https://developer.chrome.com/docs/extensions/reference/api/userScripts?hl=zh-cn#availability'
     };
 
     this.addGuidance(guidance);
@@ -127,40 +118,6 @@ export class UserGuidanceService {
     let actions: GuidanceAction[] = [];
 
     switch (reason) {
-      case 'userScripts_object_missing':
-        message = '您的浏览器版本可能不支持 UserScripts API。建议更新到最新版本的 Chrome。';
-        actions = [
-          {
-            label: '检查更新',
-            type: 'link',
-            action: 'chrome://settings/help',
-            primary: true
-          },
-          {
-            label: '了解兼容性',
-            type: 'link',
-            action: 'https://developer.chrome.com/docs/extensions/reference/userScripts/#availability'
-          }
-        ];
-        break;
-      
-      case 'permission_denied':
-        message = 'UserScripts 权限被拒绝。请在扩展管理页面中启用此权限。';
-        actions = [
-          {
-            label: '打开扩展管理',
-            type: 'link',
-            action: 'chrome://extensions/',
-            primary: true
-          },
-          {
-            label: '权限设置指南',
-            type: 'link',
-            action: 'https://github.com/your-repo/carrymonkey/wiki/enable-permissions'
-          }
-        ];
-        break;
-
       case 'functional_test_failed':
         message = 'UserScripts API 存在但无法正常工作。这可能是临时问题，请稍后重试。';
         actions = [
@@ -173,7 +130,7 @@ export class UserGuidanceService {
           {
             label: '报告问题',
             type: 'link',
-            action: 'https://github.com/your-repo/carrymonkey/issues/new'
+            action: 'https://github.com/hl85/carrymonkey/issues/new'
           }
         ];
         break;
@@ -195,7 +152,7 @@ export class UserGuidanceService {
       title: 'UserScripts API 不可用',
       message,
       actions,
-      learnMoreUrl: 'https://github.com/your-repo/carrymonkey/wiki/troubleshooting'
+      learnMoreUrl: 'https://github.com/hl85/carrymonkey/wiki/troubleshooting'
     };
 
     this.addGuidance(guidance);
@@ -204,27 +161,47 @@ export class UserGuidanceService {
   /**
    * 浏览器兼容性指导
    */
-  static addBrowserCompatibilityGuidance(): void {
-    const guidance: GuidanceMessage = {
-      type: 'browser',
-      severity: 'info',
-      title: '浏览器兼容性提示',
-      message: 'CarryMonkey 在最新版本的 Chrome 浏览器上运行效果最佳。某些功能可能在旧版本中不可用。',
-      actions: [
-        {
-          label: '检查浏览器版本',
-          type: 'link',
-          action: 'chrome://version/',
-          primary: true
-        },
-        {
-          label: '更新浏览器',
-          type: 'link',
-          action: 'chrome://settings/help'
-        }
-      ],
-      learnMoreUrl: 'https://github.com/your-repo/carrymonkey/wiki/browser-compatibility'
-    };
+  static addBrowserCompatibilityGuidance(reason = 'general'): void {
+    let guidance: GuidanceMessage;
+
+    if (reason === 'developer_mode_required') {
+      guidance = {
+        type: 'browser',
+        severity: 'warning',
+        title: '请启用开发者模式',
+        message: '在旧版 Chrome 中使用 User Scripts 功能，需要先启用开发者模式。',
+        actions: [
+          {
+            label: '打开扩展程序页面',
+            type: 'link',
+            action: 'chrome://extensions',
+            primary: true
+          }
+        ],
+        learnMoreUrl: 'https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world?hl=zh-cn#load-unpacked'
+      };
+    } else {
+      guidance = {
+        type: 'browser',
+        severity: 'info',
+        title: '浏览器兼容性提示',
+        message: 'CarryMonkey 在最新版本的 Chrome 浏览器上运行效果最佳。某些功能可能在旧版本中不可用。',
+        actions: [
+          {
+            label: '检查浏览器版本',
+            type: 'link',
+            action: 'chrome://version/',
+            primary: true
+          },
+          {
+            label: '更新浏览器',
+            type: 'link',
+            action: 'chrome://settings/help'
+          }
+        ],
+        learnMoreUrl: 'https://github.com/hl85/carrymonkey/wiki/browser-compatibility'
+      };
+    }
 
     this.addGuidance(guidance);
   }
@@ -327,7 +304,7 @@ export class UserGuidanceService {
   private static async storeGuidanceForUI(guidance: GuidanceMessage): Promise<void> {
     try {
       const stored = await chrome.storage.local.get('pendingGuidance');
-      const pendingGuidance: any[] = (stored.pendingGuidance as any[]) || [];
+      const pendingGuidance: StoredGuidanceMessage[] = (stored.pendingGuidance as StoredGuidanceMessage[]) || [];
       
       pendingGuidance.push({
         ...guidance,
@@ -364,12 +341,11 @@ export class UserGuidanceService {
       
       case 'retry_userscripts_detection': {
         // 清除缓存并重新检测
-        // 通过事件总线通知清除缓存，避免直接导入
-        GuidanceEventBus.emit('clear_userscripts_cache');
         // 触发重新检测逻辑
+        GuidanceEventBus.emit('clear_userscripts_cache');
         break;
       }
-      
+
       case 'dismiss':
         // 用户选择忽略，记录但不采取行动
         guidanceLogger.info('User dismissed guidance');
@@ -425,7 +401,7 @@ export class UserGuidanceService {
             {
               label: '了解影响',
               type: 'link',
-              action: 'https://github.com/your-repo/carrymonkey/wiki/permission-impact'
+              action: 'https://github.com/hl85/carrymonkey/wiki/permission-impact'
             }
           ]
         });

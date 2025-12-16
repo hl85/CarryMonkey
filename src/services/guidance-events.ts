@@ -8,9 +8,13 @@ import { createComponentLogger } from './logger';
 // 创建事件总线专用日志器
 const eventLogger = createComponentLogger('GuidanceEvents');
 
+export type GuidanceEventType = 'userscripts_permission_denied' | 'userscripts_unavailable' | 'browser_compatibility' | 'clear_userscripts_cache';
+
+export type GuidanceEventData = Record<string, unknown>;
+
 export interface GuidanceEvent {
-  type: 'userscripts_permission_denied' | 'userscripts_unavailable' | 'browser_compatibility' | 'clear_userscripts_cache';
-  data?: any;
+  type: GuidanceEventType;
+  data?: GuidanceEventData;
   timestamp: number;
 }
 
@@ -52,9 +56,9 @@ export class GuidanceEventBus {
   /**
    * 触发事件
    */
-  static emit(eventType: string, data?: any): void {
+  static emit(eventType: GuidanceEventType, data?: GuidanceEventData): void {
     const event: GuidanceEvent = {
-      type: eventType as any,
+      type: eventType,
       data,
       timestamp: Date.now()
     };

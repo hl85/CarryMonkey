@@ -139,7 +139,7 @@ export class UserGuidanceUI {
     `;
 
     // 绑定事件
-    this.bindGuidanceEvents(element, guidance);
+    this.bindGuidanceEvents(element);
 
     return element;
   }
@@ -180,12 +180,12 @@ export class UserGuidanceUI {
           const style = isPrimary ? primaryStyle : secondaryStyle;
           
           return `
-            <${action.type === 'link' ? 'a href="' + action.action + '" target="_blank"' : 'button'} 
+            <button 
               class="carrymonkey-guidance-action" 
               data-action="${action.action}"
               style="${baseStyle} ${style}">
               ${action.label}
-            </${action.type === 'link' ? 'a' : 'button'}>
+            </button>
           `;
         }).join('')}
       </div>
@@ -195,7 +195,7 @@ export class UserGuidanceUI {
   /**
    * 绑定指导事件
    */
-  private static bindGuidanceEvents(element: HTMLElement, _guidance: GuidanceMessage): void {
+  private static bindGuidanceEvents(element: HTMLElement): void {
     // 关闭按钮
     const closeBtn = element.querySelector('.carrymonkey-guidance-close');
     closeBtn?.addEventListener('click', () => {
@@ -205,15 +205,18 @@ export class UserGuidanceUI {
     // 操作按钮
     const actionBtns = element.querySelectorAll('.carrymonkey-guidance-action');
     actionBtns.forEach(btn => {
-      if (btn.tagName === 'BUTTON') {
-        btn.addEventListener('click', async () => {
-          const action = btn.getAttribute('data-action');
-          if (action) {
-            await this.handleAction(action);
+      btn.addEventListener('click', async (event) => {
+        event.preventDefault(); // 阻止 a 标签的默认跳转行为
+        const action = btn.getAttribute('data-action');
+        if (action) {
+          await this.handleAction(action);
+          // 只有非链接类型的按钮点击后才隐藏
+          if (btn.tagName === 'BUTTON') {
             this.hideGuidance(element);
+
           }
-        });
-      }
+        }
+      });
     });
   }
 
