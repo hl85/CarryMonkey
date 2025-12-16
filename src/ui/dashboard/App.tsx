@@ -144,6 +144,35 @@ const App: React.FC = () => {
     setSelectedMenuKey('scriptList');
   }, [editingScript, scriptContent, messageApi]);
 
+  const handleNewScript = useCallback(() => {
+    setEditingScript(null);
+    setScriptContent(getNewScriptTemplate());
+    setActiveView('newScript');
+    setSelectedMenuKey('newScript');
+  }, []);
+
+  // 键盘快捷键处理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+
+      // Ctrl/Cmd + S: 保存脚本
+      if (cmdOrCtrl && event.key === 's') {
+        event.preventDefault();
+        if (activeView === 'newScript' || activeView === 'editScript') {
+          handleSave();
+        }
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeView, handleSave]);
+
   const handleEdit = (script: UserScript) => {
     setEditingScript(script);
     setScriptContent(script.content);
@@ -258,11 +287,11 @@ const App: React.FC = () => {
               style={{ height: '100%' }}
               onSelect={({ key }) => {
                 if (key === 'newScript') {
-                  setEditingScript(null);
-                  setScriptContent(getNewScriptTemplate());
+                  handleNewScript();
+                } else {
+                  setActiveView(key);
+                  setSelectedMenuKey(key);
                 }
-                setActiveView(key);
-                setSelectedMenuKey(key);
               }}
             >
               <Menu.Item key="newScript" icon={<PlusOutlined />}>
@@ -299,7 +328,9 @@ const App: React.FC = () => {
               ) : (
                 <>
                   <Space style={{ marginBottom: 16 }}>
-                    <Button type="primary" onClick={handleSave}>保存</Button>
+                    <Button type="primary" onClick={handleSave}>
+                      保存 <span style={{ opacity: 0.7, fontSize: '12px' }}>({navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Cmd' : 'Ctrl'}+S)</span>
+                    </Button>
                     <Button onClick={() => {
                       setActiveView('scriptList');
                       setSelectedMenuKey('scriptList');
