@@ -9,7 +9,7 @@ import type { ManifestV3Export } from "@crxjs/vite-plugin";
 export const storeManifest: ManifestV3Export = {
   ...baseManifest,
 
-  name: "CarryMonkey",
+  name: "搬运猴（CarryMonkey）",
   description: "现代化的用户脚本管理器，完全符合 Chrome Web Store 规范",
 
   permissions: ["activeTab", "storage", "scripting", "tabs", "userScripts"],

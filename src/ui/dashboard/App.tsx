@@ -315,7 +315,7 @@ const App: React.FC = () => {
       >
         <h1 style={{ margin: 0, fontSize: "20px", color: "white" }}>
           <span style={{ marginRight: "10px" }}>🐵</span>
-          Carry Monkey
+          搬运猴（Carry Monkey）
           <span style={{ marginLeft: "10px", fontSize: "14px", color: "#aaa" }}>
             v{version}
           </span>
